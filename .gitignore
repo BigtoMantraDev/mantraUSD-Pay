@@ -7,7 +7,15 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-.yarn
+# Yarn 4 (Berry)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
 node_modules
 dist
 dist-ssr

@@ -16,7 +16,7 @@
     "contracts:verify:dukong": "cd packages/contracts && forge verify-contract --verifier blockscout --verifier-url https://explorer.dukong.io/api",
     "contracts:verify:mainnet": "cd packages/contracts && forge verify-contract --verifier blockscout --verifier-url https://blockscout.mantrascan.io/api"
   },
-  "packageManager": "yarn@1.22.22",
+  "packageManager": "yarn@4.12.0",
   "engines": {
     "node": ">=22.16.0"
   }

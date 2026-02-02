@@ -19,7 +19,7 @@
 
 * **Root:** Contains `packages/contracts` (Foundry) and `packages/webapp` (Vite).
 * **Focus:** You are primarily working in `packages/webapp`.
-* **Package Manager:** Yarn (Berry/Modern).
+* **Package Manager:** Yarn 4 (Berry). Requires Node.js 22+ with Corepack enabled.
 * **Commands:**
     * Run dev: `yarn workspace @dapp-evm/webapp dev`
     * Install deps: `yarn workspace @dapp-evm/webapp add [package]`
