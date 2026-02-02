@@ -25,7 +25,7 @@
 - [ ] 3.1 Create `FeeModule` with fee calculation service
 - [ ] 3.2 Implement dynamic customer fee calculation
   - Fetch gas price
-  - Apply estimated gas (150,000)
+  - Apply validated conservative gas estimate for EIP-7702 on MANTRA Chain (default 150,000 from fee-calculation spec; confirm via testing)
   - Apply buffer percent (20%)
   - Convert to mantraUSD
   - Apply min/max caps
