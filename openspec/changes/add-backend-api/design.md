@@ -219,7 +219,7 @@ class CreateSessionDto {
   duration?: number;
 
   @IsNumber()
-  @IsIn([5887, 5888])
+  @Equals(CONFIGURED_CHAIN_ID) // single-network deployment: must match configured chainId
   chainId: number;
 }
 ```
@@ -326,7 +326,11 @@ interface BackendConfig {
   // Relayer
   relayer: {
     privateKey: string;
-    minBalance: bigint;  // Alert threshold
+    // Minimum relayer balance before alerts trigger.
+    // Represented as a decimal string in native token units (e.g. "1.5"),
+    // consistent with the health check specification. The backend MUST
+    // convert this value to a bigint in wei for on-chain operations.
+    minBalance: string;
   };
 
   // Fees

@@ -146,7 +146,9 @@ Transaction submission MUST:
 If submission fails, the system MUST:
 - Capture and log error details
 - Return meaningful error to caller
-- NOT retry automatically (to prevent double-spend)
+- Apply retry logic that:
+  - MAY automatically retry on transient pre-submission errors (e.g., network errors, RPC timeouts) where no transaction hash was obtained and the node did not acknowledge the transaction
+  - MUST NOT automatically retry after successful submission (e.g., once a transaction hash is known, or on nonce/`already known`-type errors) to avoid double-spend or nonce conflicts
 
 #### Scenario: Successful transaction
 

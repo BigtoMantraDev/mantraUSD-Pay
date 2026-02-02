@@ -159,14 +159,14 @@ The request MAY include:
 - `offset` - Pagination offset (default: 0)
 - `status` - Filter by status: "active", "fulfilled", "expired"
 
-The system SHALL return sessions ordered by `createdAt` descending.
+The system SHALL return sessions ordered by `createdAt` descending, and for sessions with identical `createdAt` timestamps, ordered by `sessionId` ascending.
 
 #### Scenario: List all merchant sessions
 
 - **GIVEN** a merchant with 5 sessions
 - **WHEN** the merchant calls `GET /sessions/merchant/{address}?chainId=5887`
 - **THEN** the system returns up to 20 sessions
-- **AND** sessions are ordered by creation date (newest first)
+- **AND** sessions are ordered by creation date (newest first), and when multiple sessions share the same creation time, by `sessionId` ascending
 
 #### Scenario: Filter by status
 

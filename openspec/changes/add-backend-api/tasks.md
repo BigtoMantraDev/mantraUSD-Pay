@@ -25,7 +25,7 @@
 - [ ] 3.1 Create `FeeModule` with fee calculation service
 - [ ] 3.2 Implement dynamic customer fee calculation
   - Fetch gas price
-  - Apply estimated gas (150,000)
+  - Apply validated conservative gas estimate for EIP-7702 on MANTRA Chain (default 150,000 from fee-calculation spec; confirm via testing)
   - Apply buffer percent (20%)
   - Convert to mantraUSD
   - Apply min/max caps
@@ -48,6 +48,11 @@
 - [ ] 4.5 Implement session validity check (`GET /sessions/{id}/valid`)
 - [ ] 4.6 Implement merchant sessions list (`GET /sessions/merchant/{address}`)
 - [ ] 4.7 Add in-memory session cache with TTL
+  - Cache successful session lookups in memory
+  - Use a fixed TTL of 5 minutes (300 seconds) for cached entries
+  - Automatically invalidate and evict entries when TTL expires; on cache miss or expired entry, re-fetch from the source of truth (e.g., blockchain or database)
+  - When the cache reaches its maximum capacity (configurable, e.g., via env), evict entries using an LRU (least-recently-used) policy
+  - Document the TTL value, invalidation behavior, and eviction policy in the session-management capability spec
 - [ ] 4.8 Write unit tests for session service
 - [ ] 4.9 Write integration tests for session endpoints
 
@@ -79,7 +84,7 @@
 
 - [ ] 7.1 Write E2E tests for complete payment flow
 - [ ] 7.2 Add test fixtures for chain interactions (mock provider)
-- [ ] 7.3 Document API in `docs/scan-to-pay/API.md`
+- [ ] 7.3 Update API documentation in openspec for Scan to Pay
 - [ ] 7.4 Create Postman/Insomnia collection
 - [ ] 7.5 Write deployment guide
 
