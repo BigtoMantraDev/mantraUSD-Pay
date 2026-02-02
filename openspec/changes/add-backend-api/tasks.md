@@ -48,6 +48,11 @@
 - [ ] 4.5 Implement session validity check (`GET /sessions/{id}/valid`)
 - [ ] 4.6 Implement merchant sessions list (`GET /sessions/merchant/{address}`)
 - [ ] 4.7 Add in-memory session cache with TTL
+  - Cache successful session lookups in memory
+  - Use a fixed TTL of 5 minutes (300 seconds) for cached entries
+  - Automatically invalidate and evict entries when TTL expires; on cache miss or expired entry, re-fetch from the source of truth (e.g., blockchain or database)
+  - When the cache reaches its maximum capacity (configurable, e.g., via env), evict entries using an LRU (least-recently-used) policy
+  - Document the TTL value, invalidation behavior, and eviction policy in the session-management capability spec
 - [ ] 4.8 Write unit tests for session service
 - [ ] 4.9 Write integration tests for session endpoints
 
