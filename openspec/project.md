@@ -2,101 +2,92 @@
 
 ## Purpose
 
-mantraUSD-Pay is an EIP-7702 gasless scan-to-pay payment system built for MANTRA Chain. It enables customers to make mantraUSD payments by scanning QR codes, with gas sponsored by a backend relayer service using temporary EOA delegation.
+mantraUSD-Pay is an EIP-7702 powered gasless scan-to-pay payment system for MANTRA Chain. It enables merchants to create payment requests as QR codes and customers to pay with mantraUSD tokens without needing to hold native OM for gas fees.
 
 ## Tech Stack
 
-**Frontend:**
-- React 19 with TypeScript (strict mode)
-- Vite build system
+### Frontend
+- React 19 with Vite
 - TanStack Router (file-based routing)
-- Wagmi + Viem (Web3 interactions)
-- AppKit (WalletConnect integration)
 - Tailwind CSS v4
-- ShadCN UI components
+- Wagmi + Viem (Ethereum interactions)
+- AppKit (WalletConnect)
 
-**Smart Contracts:**
-- Foundry (Solidity development)
-- EIP-7702 DelegatedAccount implementation
-- SessionRegistry for payment sessions
+### Smart Contracts
+- Solidity 0.8.x
+- Foundry (development framework)
+- EIP-7702 (Temporary EOA delegation)
+- EIP-712 (Typed structured data signing)
 
-**Backend:**
-- NestJS (planned)
-- Transaction relayer/paymaster service
+### Backend
+- NestJS (TypeScript)
+- Transaction relay service
+- Session management
 
-**Monorepo:**
-- Yarn Berry (Modern)
-- packages/webapp (customer payment PWA)
-- packages/contracts (Foundry)
-- packages/config (shared configuration)
+### Infrastructure
+- MANTRA Chain Mainnet (Chain ID: 5888)
+- MANTRA Dukong Testnet (Chain ID: 5887)
+- mantraUSD Token (payment currency)
 
 ## Project Conventions
 
 ### Code Style
-- TypeScript strict mode, no `any` types
-- Functional React components with hooks
-- Use `createFileRoute` for TanStack Router type safety
-- ESLint + Prettier for code formatting
-- Kebab-case for file names, PascalCase for components
+- TypeScript strict mode for all frontend and backend code
+- Solidity style guide following OpenZeppelin conventions
+- Functional React components with hooks (no class components)
+- File-based routing with TanStack Router
 
 ### Architecture Patterns
-- Monorepo with shared configuration package
-- Config package as single source of truth for chains, contracts, tokens, fees
-- File-based routing in webapp
-- EIP-712 typed signatures for user authorization
-- EIP-7702 temporary delegation for gasless transactions
-
-### Configuration Package
-The `packages/webapp/src/config/` directory contains:
-- **chains.ts** - Supported chain definitions and default chain logic
-- **types.ts** - TypeScript interfaces for ChainConfig
-- **wagmi.ts** - Wagmi/AppKit setup using chain configs
-- **networks/** - Per-network configuration files (mantra-mainnet.ts, mantra-dukong.ts, local.ts)
-
-All applications must import configuration from this package to ensure consistency.
+- Monorepo structure with Yarn workspaces
+- Shared configuration package (@mantrausd-pay/config)
+- Smart contracts are stateless delegation targets
+- Frontend uses glassmorphism design with OMies brand identity
+- All transactions use TransactionDialog flow for user feedback
 
 ### Testing Strategy
-- Use existing test infrastructure in repository
-- Minimal modifications unless tests are broken by changes
-- Test contract interactions with Foundry
-- Frontend testing with React Testing Library (when added)
+- Foundry tests for smart contracts
+- Unit tests for frontend components
+- Integration tests for contract interactions
+- Simulation before transaction broadcast
 
 ### Git Workflow
 - Feature branches from main
-- Descriptive commit messages
-- Use report_progress tool for commits (do not use git directly)
-- Small, incremental changes
+- PR-based reviews
+- Conventional commits
 
 ## Domain Context
 
-**EIP-7702 Delegation:**
-- Temporary EOA delegation allowing smart contract logic without wallet migration
-- Type 4 transactions with authorization_list
-- User signs EIP-712 typed data for execution intent
-- Relayer sponsors gas and submits transaction
+### EIP-7702 Background
+EIP-7702 enables temporary EOA (Externally Owned Account) delegation via Type 4 transactions. This allows EOAs to execute smart contract logic without permanent migration, enabling:
+- Gasless transactions (relayer sponsors gas)
+- Atomic authorization + execution
+- Revocable delegation controlled by EOA owner
 
-**Fee Model:**
-- **Customer Fee**: Dynamic gas-based fee (can be enabled/disabled)
-- **Merchant Fee**: Fixed percentage service fee (can be enabled/disabled)
-- Independent toggles allow flexible business models
+### Payment Flow
+1. Merchant creates payment session via backend API
+2. Backend generates QR code with session ID
+3. Customer scans QR code, opens payment webapp
+4. Customer connects wallet and signs EIP-712 typed data (no gas needed)
+5. Backend relays Type 4 transaction (pays gas on behalf of user)
+6. Smart contract executes payment and marks session complete
 
-**mantraUSD Token:**
-- Mainnet (5888): `0xd2b95283011E47257917770D28Bb3EE44c849f6F` (symbol: mantraUSD, 6 decimals)
-- Testnet (5887): `0x4B545d0758eda6601B051259bD977125fbdA7ba2` (symbol: mmUSD, 6 decimals)
+### Fee Model
+- **Customer Fee**: Dynamic gas-based fee calculated from current gas prices (optional)
+- **Merchant Fee**: Fixed percentage-based service fee (optional)
+- Both fees can be independently enabled/disabled
+- Fees are capped at contract level for security
 
 ## Important Constraints
 
-- Must support MANTRA Mainnet (5888) and Dukong Testnet (5887)
-- Configuration is static at build time (no runtime config updates)
-- Fee parameters defined in code (requires deployment to change)
-- Must be compatible with Viem/Wagmi for Web3 interactions
-- Type safety required for all configuration access
+- Sessions have minimum 5 minutes and maximum 24 hours duration
+- Maximum fee per type is 5% (500 basis points)
+- Only whitelisted tokens can be used (initially mantraUSD only)
+- Nonce management prevents replay attacks
+- All signatures have expiration deadlines
 
 ## External Dependencies
 
-- **WalletConnect** (via AppKit) - Wallet connection
-- **MANTRA Chain RPC** - Blockchain interaction
-- **Goldsky Subgraph** - Event indexing (planned)
-- **Block Explorers** - Transaction viewing
-  - Mainnet: https://blockscout.mantrascan.io
-  - Testnet: https://explorer.dukong.io
+- MANTRA Chain RPC endpoints
+- mantraUSD ERC-20 token contract
+- WalletConnect AppKit for wallet connections
+- Block explorers for transaction links
