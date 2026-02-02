@@ -164,7 +164,6 @@ The backend serves as the relay layer for gasless EIP-7702 payments. It must:
 | Get session            | Read from cache or chain             |
 | List merchant sessions | Query SessionRegistry events + cache |
 | Validate session       | Check expiry, fulfillment status     |
-| Cancel session         | Call SessionRegistry.cancelSession() |
 
 ### Relay Module
 

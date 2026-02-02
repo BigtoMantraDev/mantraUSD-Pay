@@ -32,7 +32,7 @@ The system SHALL perform the following validations before relaying:
 
 Upon successful validation, the system SHALL:
 
-1. Construct EIP-7702 Type 4 transaction with authorization list
+1. Construct EIP-7702 Type 4 transaction with `authorization_list`
 2. Sign transaction with relayer wallet
 3. Submit transaction to the network
 4. Wait for transaction confirmation
@@ -212,7 +212,7 @@ The system SHALL construct valid EIP-7702 Type 4 transactions.
 The transaction MUST include:
 
 - `type: 4` for EIP-7702 transactions
-- `authorizationList` with user's delegation authorization
+- `authorization_list` with user's delegation authorization
 - Proper gas estimation for the delegated call
 - Chain-specific parameters (chainId, nonce, maxFeePerGas, maxPriorityFeePerGas)
 
@@ -223,7 +223,7 @@ The DelegatedAccount contract MUST be set as the delegation target.
 - **GIVEN** a valid relay request
 - **WHEN** the system constructs the transaction
 - **THEN** the transaction type is 4
-- **AND** authorizationList contains user's authorization
+- **AND** `authorization_list` contains user's authorization
 - **AND** the transaction is signed by the relayer
 
 ---
