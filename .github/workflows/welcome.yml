@@ -1,0 +1,87 @@
+name: Welcome New Repository
+
+on:
+  create:
+  push:
+    branches:
+      - main
+
+jobs:
+  welcome:
+    # Only run on the first push to a new repository
+    if: github.run_number == 1
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Welcome Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueBody = [
+              '# 🎉 Welcome to Your New MANTRA dApp!',
+              '',
+              'Thanks for using the MANTRA EVM dApp Template! Here\'s how to get started:',
+              '',
+              '## Quick Setup (5 minutes)',
+              '',
+              '### 1️⃣ Run the Setup Script',
+              '',
+              '```bash',
+              './setup.sh',
+              '```',
+              '',
+              'This will automatically configure your project with your chosen name and settings.',
+              '',
+              '### 2️⃣ Configure Environment',
+              '',
+              '```bash',
+              '# Smart contracts',
+              'cp packages/contracts/.env.example packages/contracts/.env',
+              '# Edit and add your PRIVATE_KEY',
+              '',
+              '# Web app',
+              'cp packages/webapp/.env.example packages/webapp/.env',
+              '```',
+              '',
+              '### 3️⃣ Install & Start',
+              '',
+              '```bash',
+              'yarn install',
+              'yarn dev',
+              '```',
+              '',
+              '## 📚 Documentation',
+              '',
+              '- **Setup Guide**: [TEMPLATE_SETUP.md](./TEMPLATE_SETUP.md)',
+              '- **Full README**: [README.md](./README.md)',
+              '- **MANTRA Docs**: https://docs.mantrachain.io',
+              '',
+              '## 🔐 Security Reminder',
+              '',
+              '⚠️ **NEVER commit .env files** - they contain your private keys!',
+              '',
+              '## 🆘 Need Help?',
+              '',
+              '- Check the [TEMPLATE_SETUP.md](./TEMPLATE_SETUP.md) guide',
+              '- Join the MANTRA Discord community',
+              '- Review the example components (Counter, SendToken)',
+              '',
+              '---',
+              '',
+              '**Happy Building! 🕉️**',
+              '',
+              '*You can close this issue once you\'ve completed the setup.*'
+            ].join('\n');
+
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚀 Welcome to Your MANTRA dApp!',
+              body: issueBody,
+              labels: ['documentation', 'good first issue']
+            });
+
+            console.log(`Created welcome issue #${issue.data.number}`);

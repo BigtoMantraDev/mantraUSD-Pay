@@ -1,0 +1,69 @@
+# ----------------------------------------
+# DApp Infrastructure Initialization Workflow
+# ----------------------------------------
+# PREREQUISITES:
+# --------------
+# The following environment variables MUST be defined in the organization:
+# - CLOUDFLARE_WORKERS_NONPROD_ACCOUNT_ID
+# - CLOUDFLARE_WORKERS_PROD_ACCOUNT_ID
+# - AUTOMATION_GIT_USERNAME
+# - AUTOMATION_GIT_EMAIL
+# - GITHUBAPP_ALLOW_GITHUB_WORKFLOWS_PUSH_MAIN_CLIENT_ID
+# 
+# The following secrets MUST be defined in the organization:
+# - CLOUDFLARE_WORKERS_NONPROD_API_TOKEN
+# - CLOUDFLARE_WORKERS_PROD_API_TOKEN
+# - GITHUBAPP_ALLOW_GITHUB_WORKFLOWS_PUSH_MAIN_CLIENT_SECRET
+# 
+# Note: GITHUB_TOKEN is automatically provided by GitHub Actions for repository access
+# ----------------------------------------
+
+name: "DApp Infrastructure Initialization"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+    - '.github/**'
+    - 'packages/webapp/**'
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+    paths:
+    - '.github/**'
+    - 'packages/webapp/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - preview
+          - nonprod
+          - prod
+        default: 'nonprod'
+
+permissions:
+  contents: write
+  deployments: write
+  pull-requests: write
+
+jobs:
+  deploy-cloudflare-workers:
+    uses: MANTRA-Chain-Tech/devsecops-reusable-workflows/.github/workflows/reusable-deploy-cloudflare-workers.yaml@reusable-deploy-cloudflare-workers-v3.2.0
+    with:
+      environment: ${{ inputs.environment }}
+      cloudflare_account_id_nonprod: ${{ vars.CLOUDFLARE_WORKERS_NONPROD_ACCOUNT_ID }}
+      cloudflare_account_id_prod: ${{ vars.CLOUDFLARE_WORKERS_PROD_ACCOUNT_ID }}
+      automation_git_username: ${{ vars.AUTOMATION_GIT_USERNAME }}
+      automation_git_email: ${{ vars.AUTOMATION_GIT_EMAIL }}
+      github_app_id: ${{ vars.GITHUBAPP_ALLOW_GITHUB_WORKFLOWS_PUSH_MAIN_CLIENT_ID }}
+      working_directory: '.' # Use yarn workspace
+      wrangler_config_path_from_root: 'packages/webapp/wrangler.toml'
+      readme_config_path_from_root: 'README.md'
+    secrets:
+      CLOUDFLARE_API_TOKEN_NONPROD: ${{ secrets.CLOUDFLARE_WORKERS_NONPROD_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN_PROD: ${{ secrets.CLOUDFLARE_WORKERS_PROD_API_TOKEN }}
+      GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUBAPP_ALLOW_GITHUB_WORKFLOWS_PUSH_MAIN_CLIENT_SECRET }}
+

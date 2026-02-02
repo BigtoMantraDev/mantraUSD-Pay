@@ -1,0 +1,45 @@
+# Worker name - automatically set by the deployment workflow from repository name
+name = "dapp-template-evm"
+compatibility_date = "2025-06-24"
+# Enable Node.js compatibility for better library support
+compatibility_flags = ["nodejs_compat"]
+# Enable preview URLs for pull requests (allows testing changes before merge)
+preview_urls = true
+
+# Environment for pull requests and main branch deployments
+# Add environment variables needed for non-production environments here
+[env.nonprod]
+# Enable preview URLs for pull requests (allows testing changes before merge)
+preview_urls = true
+# Non prod as always ZTA enabled
+# vars = { VAR_EXAMPLE = "Hello World" }
+# routes = [
+#   { pattern = "preview.domain.dev", custom_domain = true }
+# ]
+
+# Environment for production releases (triggered by version tags like v1.0.0 or service-name-v1.0.0)
+# Used for live production deployments
+[env.prod]
+# Zero Trust Access control - If go-live is aggreed, create a PR with ZTA_DISABLED set to "true" to disable authentication
+# Once it will be approved, merged and a commit tag is created, the application will be fully public
+vars = { ZTA_DISABLED = "false" }
+# Custom domain configuration for production
+# Uncomment and modify the following lines to use a custom domain instead of *.workers.dev
+# routes = [
+#   { pattern = "dapp-template.mantrazone.dev", custom_domain = true }
+# ]
+
+# Static assets configuration
+# Specifies where built files are located for serving
+# Path is relative to this wrangler.toml file location
+[assets] 
+directory = "./dist"
+# For SPA routing (serves index.html for unmatched routes)
+not_found_handling = "single-page-application"
+
+# Build configuration
+# Defines how to build the application before deployment
+# Path is relative to this wrangler.toml file location
+[build]
+command = "yarn run build"
+watch_dir = "./src"

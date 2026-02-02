@@ -1,0 +1,54 @@
+/* 
+ * OMies Design System - Global Styles
+ * Source of Truth: /docs/design-tokens.json
+ */
+
+/* Import Outfit Font (primary) */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&display=swap');
+
+@import 'tailwindcss';
+@plugin "tailwindcss-animate";
+/* Load the shared family tokens */
+@config "../omies-preset.js";
+
+@theme {
+  /* Tailwind v4 specific overrides */
+}
+
+@layer base {
+  :root {
+    /* OMies Brand Colors (Teal Theme) */
+    --background: 193 30% 61%; /* #7CAEBC */
+    --foreground: 0 0% 100%; /* White text on teal */
+
+    --card: 0 0% 100%; /* White cards */
+    --card-foreground: 216 30% 33%; /* Dark Blue text */
+
+    --primary: 216 30% 33%; /* Dark Blue buttons */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 42 87% 61%; /* Gold accents */
+    --secondary-foreground: 216 30% 33%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 216 30% 33%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 0 0% 100%; /* White borders */
+    --input: 0 0% 100%;
+    --ring: 216 30% 33%;
+
+    --radius: 1rem; /* Rounded-lg */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}

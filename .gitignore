@@ -1,0 +1,47 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+.yarn
+node_modules
+dist
+dist-ssr
+*.local
+
+*.env*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*storybook.log
+
+# Contract
+target
+artifacts
+schema
+
+# Terraform
+.terraform.lock.hcl
+terraform.tfstate
+.terraform
+terraform.tfstate.backup
+packages/contracts/broadcast/**/*
+
+#Tanstack routes
+.tanstack
+
+reference/

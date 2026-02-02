@@ -1,0 +1,15 @@
+# Template Repository Configuration
+# This file helps users who create a repository from this template
+
+# Files/folders to exclude when creating from template
+# (They won't be copied to the new repository)
+exclude:
+  - .github/CODEOWNERS
+  - .DS_Store
+  - node_modules/
+  - packages/contracts/cache/
+  - packages/contracts/out/
+  - packages/contracts/broadcast/
+  - packages/webapp/dist/
+  - "*.backup"
+  - "*.log"

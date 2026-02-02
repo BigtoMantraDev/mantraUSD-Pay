@@ -1,0 +1,23 @@
+{
+  "name": "dapp-evm",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "yarn workspace @dapp-evm/webapp dev",
+    "build": "yarn workspace @dapp-evm/webapp build",
+    "contracts:deploy:local": "cd packages/contracts && forge script script/Counter.s.sol:CounterScript --rpc-url local --broadcast",
+    "contracts:deploy:dukong": "cd packages/contracts && forge script script/Counter.s.sol:CounterScript --rpc-url mantra_dukong --broadcast --verify --verifier blockscout --verifier-url https://explorer.dukong.io/api",
+    "contracts:deploy:mainnet": "cd packages/contracts && forge script script/Counter.s.sol:CounterScript --rpc-url mantra_mainnet --broadcast --verify --verifier blockscout --verifier-url https://blockscout.mantrascan.io/api",
+    "contracts:test": "cd packages/contracts && forge test",
+    "contracts:test:watch": "cd packages/contracts && forge test --watch",
+    "contracts:verify:dukong": "cd packages/contracts && forge verify-contract --verifier blockscout --verifier-url https://explorer.dukong.io/api",
+    "contracts:verify:mainnet": "cd packages/contracts && forge verify-contract --verifier blockscout --verifier-url https://blockscout.mantrascan.io/api"
+  },
+  "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": ">=22.16.0"
+  }
+}

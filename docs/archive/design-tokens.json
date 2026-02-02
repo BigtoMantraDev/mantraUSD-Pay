@@ -1,0 +1,297 @@
+{
+    "$schema": "https://design-tokens.org/schema.json",
+    "name": "OMies Design System",
+    "version": "1.0.0",
+    "description": "Design tokens for OMies family dApps",
+    "colors": {
+        "brand": {
+            "teal": {
+                "value": "#7CAEBC",
+                "description": "Primary background color"
+            },
+            "blue": {
+                "value": "#3B506C",
+                "description": "Primary text, buttons, headings"
+            },
+            "yellow": {
+                "value": "#F5B842",
+                "description": "Secondary accent, highlights, CTAs"
+            },
+            "pink": {
+                "value": "#F23F98",
+                "description": "Special accent color"
+            },
+            "offwhite": {
+                "value": "#F8F9FA",
+                "description": "Light card backgrounds"
+            },
+            "skyBlue": {
+                "value": "#4FA3DC",
+                "description": "Cartoon sky background"
+            }
+        },
+        "semantic": {
+            "background": {
+                "value": "hsl(193 30% 61%)",
+                "hex": "#7CAEBC",
+                "hsl": "193 30% 61%"
+            },
+            "foreground": {
+                "value": "hsl(0 0% 100%)",
+                "hex": "#FFFFFF",
+                "hsl": "0 0% 100%"
+            },
+            "card": {
+                "value": "hsl(0 0% 100%)",
+                "hex": "#FFFFFF",
+                "hsl": "0 0% 100%"
+            },
+            "cardForeground": {
+                "value": "hsl(216 30% 33%)",
+                "hex": "#3B506C",
+                "hsl": "216 30% 33%"
+            },
+            "primary": {
+                "value": "hsl(216 30% 33%)",
+                "hex": "#3B506C",
+                "hsl": "216 30% 33%"
+            },
+            "primaryForeground": {
+                "value": "hsl(0 0% 100%)",
+                "hex": "#FFFFFF",
+                "hsl": "0 0% 100%"
+            },
+            "secondary": {
+                "value": "hsl(42 87% 61%)",
+                "hex": "#F5B842",
+                "hsl": "42 87% 61%"
+            },
+            "secondaryForeground": {
+                "value": "hsl(216 30% 33%)",
+                "hex": "#3B506C",
+                "hsl": "216 30% 33%"
+            },
+            "muted": {
+                "value": "hsl(0 0% 100%)",
+                "hex": "#FFFFFF",
+                "hsl": "0 0% 100%"
+            },
+            "mutedForeground": {
+                "value": "hsl(216 30% 33%)",
+                "hex": "#3B506C",
+                "hsl": "216 30% 33%"
+            },
+            "accent": {
+                "value": "hsl(216 30% 33%)",
+                "hex": "#3B506C",
+                "hsl": "216 30% 33%"
+            },
+            "accentForeground": {
+                "value": "hsl(0 0% 100%)",
+                "hex": "#FFFFFF",
+                "hsl": "0 0% 100%"
+            },
+            "destructive": {
+                "value": "hsl(0 84.2% 60.2%)",
+                "hex": "#EF4444",
+                "hsl": "0 84.2% 60.2%"
+            },
+            "destructiveForeground": {
+                "value": "hsl(210 40% 98%)",
+                "hex": "#F8FAFC",
+                "hsl": "210 40% 98%"
+            },
+            "border": {
+                "value": "hsl(0 0% 100%)",
+                "hex": "#FFFFFF",
+                "hsl": "0 0% 100%"
+            },
+            "input": {
+                "value": "hsl(0 0% 100%)",
+                "hex": "#FFFFFF",
+                "hsl": "0 0% 100%"
+            },
+            "ring": {
+                "value": "hsl(216 30% 33%)",
+                "hex": "#3B506C",
+                "hsl": "216 30% 33%"
+            }
+        },
+        "illustration": {
+            "hillBack": {
+                "value": "#48BB78",
+                "description": "Back green hill"
+            },
+            "hillFront": {
+                "value": "#68D391",
+                "description": "Front green hill"
+            },
+            "cloud": {
+                "value": "#FFFFFF",
+                "description": "Cloud fill"
+            },
+            "cloudStroke": {
+                "value": "#000000",
+                "description": "Cloud outline"
+            }
+        }
+    },
+    "typography": {
+        "fontFamily": {
+            "primary": {
+                "value": "FT Sterling Trial, system-ui, sans-serif",
+                "description": "Main font family"
+            },
+            "mono": {
+                "value": "ui-monospace, SFMono-Regular, monospace",
+                "description": "Code and addresses"
+            }
+        },
+        "fontWeight": {
+            "light": {
+                "value": 300
+            },
+            "book": {
+                "value": 350
+            },
+            "regular": {
+                "value": 400
+            },
+            "medium": {
+                "value": 500
+            },
+            "semibold": {
+                "value": 600
+            },
+            "bold": {
+                "value": 700
+            },
+            "black": {
+                "value": 900
+            }
+        },
+        "fontSize": {
+            "xs": {
+                "value": "0.75rem"
+            },
+            "sm": {
+                "value": "0.875rem"
+            },
+            "base": {
+                "value": "1rem"
+            },
+            "lg": {
+                "value": "1.125rem"
+            },
+            "xl": {
+                "value": "1.25rem"
+            },
+            "2xl": {
+                "value": "1.5rem"
+            },
+            "3xl": {
+                "value": "1.875rem"
+            },
+            "4xl": {
+                "value": "2.25rem"
+            },
+            "5xl": {
+                "value": "3rem"
+            },
+            "7xl": {
+                "value": "4.5rem"
+            }
+        }
+    },
+    "spacing": {
+        "radius": {
+            "sm": {
+                "value": "0.75rem",
+                "description": "Small elements"
+            },
+            "md": {
+                "value": "0.875rem",
+                "description": "Medium elements"
+            },
+            "lg": {
+                "value": "1rem",
+                "description": "Cards, dialogs (default)"
+            },
+            "xl": {
+                "value": "1.5rem",
+                "description": "Large elements"
+            },
+            "2xl": {
+                "value": "1rem",
+                "description": "Navbar"
+            },
+            "button": {
+                "value": "4px",
+                "description": "Button corners"
+            }
+        },
+        "container": {
+            "maxWidth": {
+                "value": "1400px"
+            },
+            "padding": {
+                "value": "2rem"
+            }
+        }
+    },
+    "effects": {
+        "shadow": {
+            "sm": {
+                "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)"
+            },
+            "lg": {
+                "value": "0 10px 15px -3px rgb(0 0 0 / 0.1)"
+            }
+        },
+        "blur": {
+            "sm": {
+                "value": "4px"
+            },
+            "md": {
+                "value": "12px"
+            },
+            "lg": {
+                "value": "16px"
+            }
+        },
+        "textShadow": {
+            "hero": {
+                "value": "3px 3px 0 #000"
+            }
+        }
+    },
+    "animation": {
+        "duration": {
+            "fast": {
+                "value": "0.2s"
+            },
+            "normal": {
+                "value": "0.3s"
+            },
+            "slow": {
+                "value": "0.7s"
+            }
+        },
+        "easing": {
+            "default": {
+                "value": "ease-out"
+            },
+            "inOut": {
+                "value": "ease-in-out"
+            }
+        },
+        "keyframes": {
+            "sunRotation": {
+                "value": "60s linear infinite"
+            },
+            "cloudPulse": {
+                "value": "8s ease-in-out infinite"
+            }
+        }
+    }
+}
