@@ -79,7 +79,7 @@
 
 - [ ] 7.1 Write E2E tests for complete payment flow
 - [ ] 7.2 Add test fixtures for chain interactions (mock provider)
-- [ ] 7.3 Document API in `docs/scan-to-pay/API.md`
+- [ ] 7.3 Update API documentation in openspec for Scan to Pay
 - [ ] 7.4 Create Postman/Insomnia collection
 - [ ] 7.5 Write deployment guide
 
