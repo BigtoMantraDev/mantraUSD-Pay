@@ -220,7 +220,7 @@ class CreateSessionDto {
   duration?: number;
 
   @IsNumber()
-  @IsIn([5887, 5888])
+  @Equals(CONFIGURED_CHAIN_ID) // single-network deployment: must match configured chainId
   chainId: number;
 }
 ```
