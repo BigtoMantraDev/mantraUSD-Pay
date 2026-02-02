@@ -217,7 +217,7 @@ sequenceDiagram
     PWA ->> PWA: Display payment details
     C ->> W: Connect Wallet
     W -->> PWA: Return address
-    PWA ->> PWA: Check balance ≥ amount
+    PWA ->> PWA: Check balance ≥ customerPays<br/>(amount + customerFee if enabled)
     C ->> PWA: Tap "Pay" button
     Note over PWA: Build EIP-712 typed data<br/>for execution intent
     PWA ->> W: Request signature<br/>(EIP-712 typed data)
@@ -225,8 +225,9 @@ sequenceDiagram
     W -->> PWA: Return signature
     PWA ->> BE: POST /relay<br/>{sessionId, signature, intent}
     Note over BE: Build EIP-7702 Type 4 TX<br/>with authorization_list
-    BE ->> SC: Submit Type 4 Transaction<br/>(Paymaster pays gas)
-    SC ->> SC: Verify signature<br/>Execute transfer<br/>Mark session fulfilled
+    BE ->> SC: Submit Type 4 Transaction<br/>(Relayer pays gas)
+    Note over SC: DelegatedAccount.execute()<br/>calls SessionRegistry.fulfillSession()<br/>which executes transfers:<br/>• customerPays to merchant<br/>• customerFee to relayer<br/>• merchantFee to feeCollector
+    SC -->> SC: Mark session fulfilled
     SC -->> BE: Transaction receipt
     BE -->> PWA: Success + txHash
     PWA -->> C: Show success screen
@@ -303,12 +304,12 @@ packages/
 │   └── src/
 │       ├── routes/
 │       └── hooks/
-|── backend/             # NestJS API + Relayer
-|   └── src/
-|       └── modules/
-|           ├── session/
-|           ├── relay/
-|           └── blockchain/
+├── backend/             # NestJS API + Relayer
+│   └── src/
+│       └── modules/
+│           ├── session/
+│           ├── relay/
+│           └── blockchain/
 ├── docs/
 │   └── scan-to-pay/
 │       ├── API.md                           # Backend API documentation
@@ -493,6 +494,7 @@ interface ISessionRegistry {
         // Customer fee (validated but calculated off-chain)
         bool customerFeeEnabled;     // Toggle for customer fee
         uint256 maxCustomerFee;      // Max customer fee in token units
+        uint256 minCustomerFee;      // Min customer fee in token units
         // Common
         address feeCollector;        // Address receiving merchant fees
     }
@@ -590,6 +592,9 @@ interface ISessionRegistry {
     function createSession(
         address token,
         uint256 amount,
+        uint256 customerFee,
+        uint256 customerPays,
+        uint256 merchantReceives,
         string calldata reference,
         uint256 duration
     ) external returns (bytes32 sessionId);
@@ -889,7 +894,9 @@ stateDiagram-v2
 - Display total amount customer will pay
 - Show merchant name/address
 - Display fee breakdown (transparency)
-- Show "Network Fee: $0.00 (Gasless!)"
+- Show network fee line:
+  - If `customerFeeEnabled` is **true**: show `Network Fee: $X.XX` where `$X.XX` equals the computed `customerFee`.
+  - If `customerFeeEnabled` is **false**: show `Network Fee: $0.00 (Gasless!)`.
 - Show "You Pay" total
 - Optionally show "Merchant receives" amount
 - Expiry countdown timer
