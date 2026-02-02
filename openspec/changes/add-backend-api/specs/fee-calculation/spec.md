@@ -234,12 +234,13 @@ All fee calculations SHALL use the token's native precision (6 decimals for mant
 The system SHALL:
 
 - Perform calculations in token units (micro-units)
-- Round fees UP (ceiling) to protect against underflow
+- Round fees UP using mathematical ceiling at the token's precision (e.g. 6 decimal places for mantraUSD), i.e. always rounding toward +∞ but leaving values already at that precision unchanged
 - Return formatted values as decimal strings
 
 #### Scenario: Precision handling
 
 - **GIVEN** a calculated fee of 0.055555 mantraUSD
 - **WHEN** the fee is formatted
-- **THEN** the result is "0.055556" (rounded up)
+- **THEN** the result is "0.055556" (rounded up using 6-decimal-place ceiling)
+- **AND** a fee already at 6-decimal precision (e.g. 0.055550 stored as 55,550 micro-units) is not increased by ceiling and MAY be formatted without redundant trailing zeros (e.g. "0.05555")
 - **AND** internal storage uses 6 decimal places
