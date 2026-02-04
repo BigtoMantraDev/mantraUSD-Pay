@@ -1,6 +1,7 @@
 # Backend Relayer Service
 
-NestJS backend service that relays gasless EIP-7702 transactions for mantraUSD-Pay. Users sign EIP-712 typed data off-chain, and this service broadcasts transactions to MANTRA Chain while paying gas fees on their behalf.
+NestJS backend service that relays gasless EIP-7702 transactions for mantraUSD-Pay. Users sign EIP-712 typed data
+off-chain, and this service broadcasts transactions to MANTRA Chain while paying gas fees on their behalf.
 
 ## Features
 
@@ -21,7 +22,7 @@ NestJS backend service that relays gasless EIP-7702 transactions for mantraUSD-P
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - Yarn 4 (Berry)
 - Access to MANTRA Chain RPC
 - Relayer wallet with native tokens for gas
@@ -43,13 +44,13 @@ Copy `.env.example` to `.env` and configure.
 
 ### Required Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `CHAIN_ID` | MANTRA Chain ID | `5888` (mainnet) or `5887` (testnet) |
-| `RPC_URL` | JSON-RPC endpoint | `https://rpc.mantrachain.io` |
-| `RELAYER_PRIVATE_KEY` | Relayer wallet private key | `0x...` |
-| `DELEGATED_ACCOUNT_ADDRESS` | Deployed DelegatedAccount contract | `0x...` |
-| `TOKEN_ADDRESS` | mantraUSD token address | `0xd2b95283011E47257917770D28Bb3EE44c849f6F` |
+| Variable                    | Description                        | Example                                      |
+|-----------------------------|------------------------------------|----------------------------------------------|
+| `CHAIN_ID`                  | MANTRA Chain ID                    | `5888` (mainnet) or `5887` (testnet)         |
+| `RPC_URL`                   | JSON-RPC endpoint                  | `https://rpc.mantrachain.io`                 |
+| `RELAYER_PRIVATE_KEY`       | Relayer wallet private key         | `0x...`                                      |
+| `DELEGATED_ACCOUNT_ADDRESS` | Deployed DelegatedAccount contract | `0x...`                                      |
+| `TOKEN_ADDRESS`             | mantraUSD token address            | `0xd2b95283011E47257917770D28Bb3EE44c849f6F` |
 
 ## Running the Service
 
@@ -62,13 +63,30 @@ yarn workspace backend build
 yarn workspace backend start:prod
 ```
 
-## API Endpoints
+## API Documentation
 
-See implementation files for complete API documentation:
-- Fee API: `GET /fees/quote`
-- Nonce API: `GET /nonce/:address`
-- Relay API: `POST /relay`, `GET /relay/status`
-- Health: `GET /health`
+Interactive API documentation is available via **Scalar API Reference** at `/scalar` when the server is running.
+
+```
+http://localhost:3000/api/scalar
+```
+
+All API endpoints are prefixed with `/api`.
+
+### API Endpoints
+
+- **Fee API** (`/api/fees`): Fee calculation and quotes
+    - `GET /api/fees/quote` - Get current relay fee quote
+
+- **Nonce API** (`/api/nonce`): On-chain nonce queries
+    - `GET /api/nonce/:address` - Query account nonce
+
+- **Relay API** (`/api/relay`): Transaction relay and status
+    - `POST /api/relay` - Submit signed intent for relay
+    - `GET /api/relay/status` - Check relayer health and balance
+
+- **Health API** (`/api/health`): Service monitoring
+    - `GET /api/health` - Service health check
 
 ## Security
 
