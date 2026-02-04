@@ -102,7 +102,7 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
 
         // Execute call
         // Note: With nonReentrant protection, we execute first then update state
-        // If the call fails, we revert at line 110, preventing nonce increment
+        // If the call fails, we revert below, preventing nonce increment
         (bool success, bytes memory returnData) = destination.call{ value: value }(data);
 
         if (!success) {
@@ -120,13 +120,9 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
 
     /**
      * @inheritdoc IDelegatedAccount
-     * @dev This function allows direct token transfers when the caller has approved
-     *      the DelegatedAccount contract. Use with caution - only approve exact amounts
-     *      needed for specific transactions.
-     * @notice SECURITY WARNING: This function will transfer tokens from msg.sender to the
-     *         recipient. Only call this if you have specifically approved this contract
-     *         and intend to make the transfer immediately. Consider using execute() with
-     *         proper signature verification for better security.
+     * @notice SECURITY WARNING: This function transfers tokens from msg.sender to the recipient.
+     *         Only approve this contract for the exact amount needed for immediate transfer.
+     *         For better security with gasless transactions, use execute() with signature verification.
      */
     function transferToken(address token, address to, uint256 amount) external nonReentrant {
         if (token == address(0)) revert InvalidToken();
