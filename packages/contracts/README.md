@@ -22,11 +22,10 @@ cp .env.example .env
 
 ## Configuration
 
-The project uses three configuration files:
+The project uses two configuration files:
 
 - **`foundry.toml`**: Foundry project settings and RPC endpoints
 - **`config/chains.toml`**: Chain-specific configuration (addresses, explorers, etc.)
-- **`src/MantraConfig.sol`**: Solidity helper for accessing chain configurations
 
 ## Important Contract Addresses
 
@@ -109,31 +108,6 @@ Contracts are automatically verified on Blockscout when using the `--verify` fla
 To verify manually:
 ```bash
 forge verify-contract <contract_address> <contract_name> --chain-id <chain_id>
-```
-
-### Using MantraConfig in Scripts
-
-```solidity
-import {MantraConfig} from "../src/MantraConfig.sol";
-
-contract DeployScript is MantraConfig {
-    function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        
-        vm.startBroadcast(deployerPrivateKey);
-
-        // Get chain-specific addresses
-        ChainAddresses memory addresses = getCurrentChainAddresses();
-        
-        console.log("Deploying on:", getChainName(block.chainid));
-        console.log("Wrapped OM:", addresses.wrappedOM);
-        console.log("Multicall3:", addresses.multicall3);
-
-        // Your deployment logic here
-
-        vm.stopBroadcast();
-    }
-}
 ```
 
 ## Block Explorers
