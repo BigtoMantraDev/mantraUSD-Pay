@@ -4,6 +4,7 @@ import {
   HealthCheckService,
   MemoryHealthIndicator,
 } from '@nestjs/terminus';
+import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('health')
@@ -12,6 +13,7 @@ export class HealthController {
   constructor(
     private health: HealthCheckService,
     private memory: MemoryHealthIndicator,
+    private configService: ConfigService,
   ) {}
 
   @Get()
@@ -36,9 +38,13 @@ export class HealthController {
     description: 'Service is unhealthy',
   })
   check() {
+    const memoryHeapMB = this.configService.get<number>('health.memoryHeapMB')!;
+    const memoryHeapBytes = memoryHeapMB * 1024 * 1024;
+    
     return this.health.check([
-      // Check memory usage (heap should be under 300MB)
-      () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
+      // Check memory usage (heap threshold)
+      // Configurable via HEALTH_MEMORY_HEAP_MB env var (default: 512MB)
+      () => this.memory.checkHeap('memory_heap', memoryHeapBytes),
     ]);
   }
 }

@@ -33,5 +33,9 @@ export default () => ({
     limit: parseInt(process.env.RATE_LIMIT_MAX || '10', 10),
   },
 
+  health: {
+    memoryHeapMB: parseInt(process.env.HEALTH_MEMORY_HEAP_MB || '512', 10),
+  },
+
   maxGasPriceGwei: parseFloat(process.env.MAX_GAS_PRICE_GWEI || '100'),
 });
