@@ -13,6 +13,7 @@ import { Test, console } from "forge-std/Test.sol";
  */
 contract MockTarget {
     bool public wasCalled;
+    uint256 public ethReceived;
 
     function doSomething() external returns (bool) {
         wasCalled = true;
@@ -26,6 +27,17 @@ contract MockTarget {
 
     function doFail() external pure {
         revert("MockTarget: intended failure");
+    }
+
+    // Function to receive ETH
+    function receiveEth() external payable {
+        wasCalled = true;
+        ethReceived = msg.value;
+    }
+
+    // Allow contract to receive ETH
+    receive() external payable {
+        ethReceived = msg.value;
     }
 }
 
@@ -45,9 +57,9 @@ contract DelegatedAccountTest is Test {
     address public recipient;
 
     bytes32 public constant EXECUTE_TYPEHASH =
-        keccak256("ExecuteData(address destination,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
+        keccak256("ExecuteData(address account,address destination,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
 
-    event Executed(address indexed executor, address indexed destination, uint256 value, uint256 nonce, bool success);
+    event Executed(address indexed account, address indexed destination, uint256 value, uint256 nonce, bool success);
 
     event TokenTransferred(address indexed token, address indexed from, address indexed to, uint256 amount);
 
@@ -97,14 +109,13 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
-        // Execute as owner (simulating EIP-7702 delegation)
-        vm.prank(owner);
+        // Execute - can be called by anyone (e.g., relayer), but signature must be from owner
         vm.expectEmit(true, true, false, true);
         emit Executed(owner, destination, value, nonce, true);
 
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
 
         // Verify nonce incremented
         assertEq(delegatedAccount.getNonce(owner), 1);
@@ -119,9 +130,11 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        // Sign with wrong key
+        // Sign with user's key, but try to execute for owner's account
+        // The signature will recover to user's address, which won't match owner
         bytes memory signature = _signExecute(
-            userPrivateKey, // Wrong signer
+            userPrivateKey, // Signer
+            owner,          // Account in signature (won't match recovered signer)
             destination,
             value,
             data,
@@ -129,9 +142,8 @@ contract DelegatedAccountTest is Test {
             deadline
         );
 
-        vm.prank(owner);
         vm.expectRevert(DelegatedAccount.InvalidSignature.selector);
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
     }
 
     function test_Execute_InvalidNonce() public {
@@ -141,11 +153,10 @@ contract DelegatedAccountTest is Test {
         uint256 wrongNonce = 5; // Should be 0
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, wrongNonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, wrongNonce, deadline);
 
-        vm.prank(owner);
         vm.expectRevert(DelegatedAccount.InvalidNonce.selector);
-        delegatedAccount.execute(destination, value, data, wrongNonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, wrongNonce, deadline, signature);
     }
 
     function test_Execute_ReplayAttack() public {
@@ -157,17 +168,14 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
-
-        vm.startPrank(owner);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
         // First execution should succeed
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
 
         // Replay should fail
         vm.expectRevert(DelegatedAccount.InvalidNonce.selector);
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
-        vm.stopPrank();
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
     }
 
     function test_Execute_ExpiredDeadline() public {
@@ -177,11 +185,10 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp - 1; // Already expired
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
-        vm.prank(owner);
         vm.expectRevert(DelegatedAccount.SignatureExpired.selector);
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
     }
 
     function test_Execute_DeadlineAtCurrentBlock() public {
@@ -193,11 +200,10 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp; // Inclusive deadline
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
-        vm.prank(owner);
         // Should succeed - deadline is inclusive
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
 
         assertTrue(mockTarget.wasCalled());
     }
@@ -209,11 +215,10 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
-        vm.prank(owner);
         vm.expectRevert(DelegatedAccount.InvalidDestination.selector);
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
     }
 
     function test_Execute_SelfCallPrevention() public {
@@ -223,11 +228,10 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
-        vm.prank(owner);
         vm.expectRevert(DelegatedAccount.InvalidDestination.selector);
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
     }
 
     function test_Execute_TargetCallFailure() public {
@@ -238,11 +242,10 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
-        vm.prank(owner);
         vm.expectRevert(); // Propagates the ERC20 error
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
     }
 
     function test_Execute_ERC20Transfer_RecipientReceivesTokens() public {
@@ -269,12 +272,11 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
-        // Execute as owner (the msg.sender that gets nonce tracked)
+        // Execute - owner signs, anyone can relay
         // The actual transfer comes from address(delegatedAccount) since that's where execute() runs
-        vm.prank(owner);
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
 
         // Verify recipient received tokens
         assertEq(token.balanceOf(recipient), recipientBalanceBefore + transferAmount, "Recipient should receive tokens");
@@ -303,11 +305,10 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
 
         // Execute
-        vm.prank(owner);
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
 
         // Verify recipient received tokens
         assertEq(token.balanceOf(recipient), recipientBalanceBefore + transferAmount, "Recipient should receive tokens");
@@ -326,12 +327,11 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        // Sign with owner's key (smart wallet owner)
-        bytes memory signature = _signExecute(ownerPrivateKey, destination, value, data, nonce, deadline);
+        // Sign with owner's key (smart wallet owner) for the smart wallet account
+        bytes memory signature = _signExecute(ownerPrivateKey, address(smartWallet), destination, value, data, nonce, deadline);
 
-        // Execute as smart wallet - signature verification should use EIP-1271
-        vm.prank(address(smartWallet));
-        delegatedAccount.execute(destination, value, data, nonce, deadline, signature);
+        // Execute - signature verification should use EIP-1271
+        delegatedAccount.execute(address(smartWallet), destination, value, data, nonce, deadline, signature);
 
         // Verify nonce incremented
         assertEq(delegatedAccount.getNonce(address(smartWallet)), 1);
@@ -378,6 +378,93 @@ contract DelegatedAccountTest is Test {
         vm.stopPrank();
     }
 
+    // ============ ETH Handling Tests ============
+
+    function test_Execute_WithETHValue() public {
+        MockTarget mockTarget = new MockTarget();
+        
+        // Fund the DelegatedAccount contract with ETH
+        vm.deal(address(delegatedAccount), 10 ether);
+
+        address destination = address(mockTarget);
+        uint256 value = 1 ether;
+        bytes memory data = abi.encodeWithSelector(MockTarget.receiveEth.selector);
+        uint256 nonce = 0;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
+
+        uint256 contractBalanceBefore = address(delegatedAccount).balance;
+        uint256 targetBalanceBefore = address(mockTarget).balance;
+
+        // Execute transfer with ETH value
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
+
+        // Verify ETH was transferred
+        assertEq(address(delegatedAccount).balance, contractBalanceBefore - value, "Contract ETH balance should decrease");
+        assertEq(address(mockTarget).balance, targetBalanceBefore + value, "Target should receive ETH");
+        assertEq(mockTarget.ethReceived(), value, "Target should record ETH received");
+        assertTrue(mockTarget.wasCalled(), "Target function should be called");
+    }
+
+    function test_Execute_InsufficientETH() public {
+        MockTarget mockTarget = new MockTarget();
+        
+        // Don't fund the contract - it has 0 ETH
+
+        address destination = address(mockTarget);
+        uint256 value = 1 ether; // Try to send 1 ETH with 0 balance
+        bytes memory data = abi.encodeWithSelector(MockTarget.receiveEth.selector);
+        uint256 nonce = 0;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, destination, value, data, nonce, deadline);
+
+        // Should fail due to insufficient balance
+        vm.expectRevert();
+        delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
+        
+        // Nonce should not increment on failure
+        assertEq(delegatedAccount.getNonce(owner), 0, "Nonce should not increment on failure");
+    }
+
+    function test_ReceiveETH() public {
+        // Test that the contract can receive ETH via receive()
+        uint256 sendAmount = 5 ether;
+        uint256 balanceBefore = address(delegatedAccount).balance;
+
+        // Send ETH to the contract
+        (bool success,) = address(delegatedAccount).call{value: sendAmount}("");
+        assertTrue(success, "ETH transfer should succeed");
+
+        assertEq(address(delegatedAccount).balance, balanceBefore + sendAmount, "Contract should receive ETH");
+    }
+
+    function test_Execute_ETHTransferToEOA() public {
+        // Test sending ETH to an EOA (not a contract)
+        address payable ethRecipient = payable(makeAddr("ethRecipient"));
+        
+        // Fund the DelegatedAccount contract with ETH
+        vm.deal(address(delegatedAccount), 10 ether);
+
+        uint256 value = 2 ether;
+        bytes memory data = ""; // Empty data for simple ETH transfer
+        uint256 nonce = 0;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, ethRecipient, value, data, nonce, deadline);
+
+        uint256 contractBalanceBefore = address(delegatedAccount).balance;
+        uint256 recipientBalanceBefore = ethRecipient.balance;
+
+        // Execute ETH transfer
+        delegatedAccount.execute(owner, ethRecipient, value, data, nonce, deadline, signature);
+
+        // Verify ETH was transferred
+        assertEq(address(delegatedAccount).balance, contractBalanceBefore - value, "Contract ETH balance should decrease");
+        assertEq(ethRecipient.balance, recipientBalanceBefore + value, "Recipient should receive ETH");
+    }
+
     // ============ Nonce Tests ============
 
     function test_GetNonce_InitialValue() public view {
@@ -394,11 +481,10 @@ contract DelegatedAccountTest is Test {
         bytes memory data = abi.encodeWithSelector(MockTarget.doSomething.selector);
         uint256 deadline = block.timestamp + 1 hours;
 
-        vm.startPrank(owner);
-
         for (uint256 i = 0; i < 5; i++) {
             bytes memory signature = _signExecute(
                 ownerPrivateKey,
+                owner,
                 destination,
                 value,
                 data,
@@ -406,16 +492,16 @@ contract DelegatedAccountTest is Test {
                 deadline
             );
 
-            delegatedAccount.execute(destination, value, data, i, deadline, signature);
+            delegatedAccount.execute(owner, destination, value, data, i, deadline, signature);
             assertEq(delegatedAccount.getNonce(owner), i + 1);
         }
-        vm.stopPrank();
     }
 
     // ============ Helper Functions ============
 
     function _signExecute(
         uint256 privateKey,
+        address account,
         address destination,
         uint256 value,
         bytes memory data,
@@ -426,7 +512,7 @@ contract DelegatedAccountTest is Test {
         view
         returns (bytes memory)
     {
-        bytes32 structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, destination, value, keccak256(data), nonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
 
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", delegatedAccount.DOMAIN_SEPARATOR(), structHash));
 
