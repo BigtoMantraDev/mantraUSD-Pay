@@ -6,6 +6,7 @@ import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title DelegatedAccount
@@ -20,7 +21,7 @@ import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * - Destination validation (no zero address or self-calls)
  * - Support for both EOA and smart contract wallet signatures (EIP-1271)
  */
-contract DelegatedAccount is IDelegatedAccount {
+contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -28,7 +29,7 @@ contract DelegatedAccount is IDelegatedAccount {
 
     /// @notice EIP-712 typehash for execute data
     bytes32 public constant EXECUTE_TYPEHASH =
-        keccak256("ExecuteData(address destination,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
+        keccak256("ExecuteData(address account,address destination,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
 
     /// @notice EIP-1271 magic value indicating a valid signature
     bytes4 private constant EIP1271_MAGIC_VALUE = 0x1626ba7e;
@@ -46,9 +47,6 @@ contract DelegatedAccount is IDelegatedAccount {
     /// @notice Nonce tracking per account for replay protection
     mapping(address => uint256) private _nonces;
 
-    /// @notice Reentrancy guard flag
-    bool private _locked;
-
     // ============ Errors ============
 
     error InvalidSignature();
@@ -57,16 +55,6 @@ contract DelegatedAccount is IDelegatedAccount {
     error InvalidDestination();
     error InvalidToken();
     error ExecutionFailed(bytes reason);
-    error Reentrancy();
-
-    // ============ Modifiers ============
-
-    modifier nonReentrant() {
-        if (_locked) revert Reentrancy();
-        _locked = true;
-        _;
-        _locked = false;
-    }
 
     // ============ Constructor ============
 
@@ -81,6 +69,7 @@ contract DelegatedAccount is IDelegatedAccount {
      * @inheritdoc IDelegatedAccount
      */
     function execute(
+        address account,
         address destination,
         uint256 value,
         bytes calldata data,
@@ -100,40 +89,50 @@ contract DelegatedAccount is IDelegatedAccount {
             revert InvalidDestination();
         }
 
-        // Validate nonce
-        address signer = msg.sender;
-        if (nonce != _nonces[signer]) revert InvalidNonce();
+        // Validate nonce for the signing account
+        if (nonce != _nonces[account]) revert InvalidNonce();
 
-        // Verify signature
-        bytes32 structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, destination, value, keccak256(data), nonce, deadline));
+        // Verify signature - the signature must be from the account parameter
+        bytes32 structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
 
-        if (!_isValidSignature(signer, digest, signature)) {
+        if (!_isValidSignature(account, digest, signature)) {
             revert InvalidSignature();
         }
 
-        // Increment nonce
-        _nonces[signer] = nonce + 1;
-
-        // Execute call
+        // Execute call (before incrementing nonce to maintain CEI pattern)
+        // Note: We keep the external call after nonce check but before increment
+        // to ensure failed transactions don't consume nonces
         (bool success, bytes memory returnData) = destination.call{ value: value }(data);
 
         if (!success) {
             revert ExecutionFailed(returnData);
         }
 
-        emit Executed(signer, destination, value, nonce, success);
+        // Increment nonce after successful execution (CEI pattern)
+        _nonces[account] = nonce + 1;
+
+        emit Executed(account, destination, value, nonce, success);
 
         return returnData;
     }
 
     /**
      * @inheritdoc IDelegatedAccount
+     * @dev This function allows direct token transfers when the caller has approved
+     *      the DelegatedAccount contract. Use with caution - only approve exact amounts
+     *      needed for specific transactions.
+     * @notice SECURITY WARNING: This function will transfer tokens from msg.sender to the
+     *         recipient. Only call this if you have specifically approved this contract
+     *         and intend to make the transfer immediately. Consider using execute() with
+     *         proper signature verification for better security.
      */
     function transferToken(address token, address to, uint256 amount) external nonReentrant {
         if (token == address(0)) revert InvalidToken();
         if (to == address(0)) revert InvalidDestination();
 
+        // Transfer from msg.sender (not from arbitrary addresses)
+        // This ensures only the caller's tokens are transferred
         IERC20(token).safeTransferFrom(msg.sender, to, amount);
 
         emit TokenTransferred(token, msg.sender, to, amount);

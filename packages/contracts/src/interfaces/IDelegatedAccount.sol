@@ -9,13 +9,13 @@ pragma solidity ^0.8.20;
 interface IDelegatedAccount {
     /**
      * @notice Emitted when a call is successfully executed
-     * @param executor The address that initiated the execution (msg.sender)
+     * @param account The account that authorized the execution
      * @param destination The target contract address
      * @param value The ETH value sent with the call
      * @param nonce The nonce used for this execution
      * @param success Whether the call succeeded
      */
-    event Executed(address indexed executor, address indexed destination, uint256 value, uint256 nonce, bool success);
+    event Executed(address indexed account, address indexed destination, uint256 value, uint256 nonce, bool success);
 
     /**
      * @notice Emitted when tokens are transferred via the helper function
@@ -28,6 +28,7 @@ interface IDelegatedAccount {
 
     /**
      * @notice Execute a call on behalf of the delegating account
+     * @param account The account that signed the authorization (owns the funds)
      * @param destination The target contract to call
      * @param value The ETH value to send with the call
      * @param data The calldata to send to the target
@@ -37,6 +38,7 @@ interface IDelegatedAccount {
      * @return The return data from the executed call
      */
     function execute(
+        address account,
         address destination,
         uint256 value,
         bytes calldata data,
