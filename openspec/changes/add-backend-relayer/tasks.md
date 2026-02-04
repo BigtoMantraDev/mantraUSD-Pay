@@ -14,7 +14,7 @@
 - [x] 2.2 Implement chain configuration (mainnet 5888, testnet 5887)
 - [x] 2.3 Create RelayerWalletService for transaction signing
 - [x] 2.4 Add gas price oracle service
-- [ ] 2.5 Write unit tests for blockchain services
+- [x] 2.5 Write unit tests for blockchain services (blockchain.service, relayer-wallet.service, gas-oracle.service)
 
 ## 3. Fee Module
 
@@ -23,7 +23,7 @@
 - [x] 3.3 Add fee calculation logic (gas × price × buffer)
 - [x] 3.4 Implement fee caps (min 0.01, max 1.00)
 - [x] 3.5 Add quote TTL (60 seconds expiration)
-- [ ] 3.6 Write unit tests for fee calculation
+- [x] 3.6 Write unit tests for fee calculation (comprehensive fee.service.spec.ts)
 - [ ] 3.7 Write e2e tests for fee endpoint
 
 ## 4. Nonce Module
@@ -32,7 +32,7 @@
 - [x] 4.2 Implement `GET /nonce/:address` endpoint
 - [x] 4.3 Query DelegatedAccount.getNonce() on-chain
 - [x] 4.4 Add chainId query parameter validation
-- [ ] 4.5 Write unit tests for nonce service
+- [x] 4.5 Write unit tests for nonce service (nonce.service.spec.ts)
 - [ ] 4.6 Write e2e tests for nonce endpoint
 
 ## 5. Relay Module
@@ -44,7 +44,7 @@
 - [x] 5.5 Build and send EIP-7702 Type 4 transaction
 - [x] 5.6 Implement `GET /relay/status` for relayer health
 - [x] 5.7 Add rate limiting (10 req/min/IP)
-- [ ] 5.8 Write unit tests for relay service
+- [x] 5.8 Write unit tests for relay service (relay.service.spec.ts with EIP-712 verification)
 - [ ] 5.9 Write e2e tests for relay endpoints
 
 ## 6. Health & Monitoring
@@ -52,7 +52,7 @@
 - [x] 6.1 Add NestJS Terminus health checks
 - [x] 6.2 Implement relayer balance monitoring
 - [x] 6.3 Add structured logging (JSON format)
-- [ ] 6.4 Configure Swagger/OpenAPI documentation
+- [x] 6.4 Configure Swagger/OpenAPI documentation (Scalar integration at /scalar)
 
 ## 7. Integration Testing
 
