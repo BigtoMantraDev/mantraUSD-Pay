@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "yarn workspace @dapp-evm/webapp dev",
     "build": "yarn workspace @dapp-evm/webapp build",
+    "backend:dev": "yarn workspace backend start:dev",
+    "backend:build": "yarn workspace backend build",
+    "backend:start": "yarn workspace backend start:prod",
     "contracts:deploy:local": "cd packages/contracts && forge script script/Counter.s.sol:CounterScript --rpc-url local --broadcast",
     "contracts:deploy:dukong": "cd packages/contracts && forge script script/Counter.s.sol:CounterScript --rpc-url mantra_dukong --broadcast --verify --verifier blockscout --verifier-url https://explorer.dukong.io/api",
     "contracts:deploy:mainnet": "cd packages/contracts && forge script script/Counter.s.sol:CounterScript --rpc-url mantra_mainnet --broadcast --verify --verifier blockscout --verifier-url https://blockscout.mantrascan.io/api",
