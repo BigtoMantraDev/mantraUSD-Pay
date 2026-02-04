@@ -93,9 +93,41 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
         if (nonce != _nonces[account]) revert InvalidNonce();
 
         // Verify signature - the signature must be from the account parameter
-        bytes32 structHash =
-            keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
+        bytes32 dataHash;
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            calldatacopy(m, data.offset, data.length)
+            dataHash := keccak256(m, data.length)
+        }
+        bytes32 typeHash = EXECUTE_TYPEHASH;
+        bytes32 structHash;
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Compute structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, dataHash, nonce,
+            // deadline))
+            let m := mload(0x40)
+            mstore(m, typeHash)
+            mstore(add(m, 0x20), account)
+            mstore(add(m, 0x40), destination)
+            mstore(add(m, 0x60), value)
+            mstore(add(m, 0x80), dataHash)
+            mstore(add(m, 0xa0), nonce)
+            mstore(add(m, 0xc0), deadline)
+            structHash := keccak256(m, 0xe0)
+        }
+
+        bytes32 domainSep = domainSeparator();
+        bytes32 digest;
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Compute digest = keccak256("\x19\x01" || domainSeparator || structHash)
+            let m := mload(0x40)
+            mstore(m, 0x1901000000000000000000000000000000000000000000000000000000000000)
+            mstore(add(m, 0x02), domainSep)
+            mstore(add(m, 0x22), structHash)
+            digest := keccak256(m, 0x42)
+        }
 
         if (!_isValidSignature(account, digest, signature)) {
             revert InvalidSignature();
@@ -146,7 +178,7 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
     /**
      * @inheritdoc IDelegatedAccount
      */
-    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+    function domainSeparator() public view returns (bytes32) {
         // If chain ID hasn't changed, use cached separator
         if (block.chainid == _CHAIN_ID) {
             return _DOMAIN_SEPARATOR;
@@ -159,18 +191,26 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
 
     /**
      * @notice Compute the EIP-712 domain separator
-     * @return The domain separator hash
+     * @return result The domain separator hash
      */
-    function _computeDomainSeparator() private view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("DelegatedAccount"),
-                keccak256("1"),
-                block.chainid,
-                address(this)
-            )
-        );
+    function _computeDomainSeparator() private view returns (bytes32 result) {
+        // EIP712Domain typehash: keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+        bytes32 typeHash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
+        // keccak256("DelegatedAccount")
+        bytes32 nameHash = 0x8fb3717175124fe77482abbbf65ce134bcb0a3c323ed0623cb87540ae3d69ffa;
+        // keccak256("1")
+        bytes32 versionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
+
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            mstore(m, typeHash)
+            mstore(add(m, 0x20), nameHash)
+            mstore(add(m, 0x40), versionHash)
+            mstore(add(m, 0x60), chainid())
+            mstore(add(m, 0x80), address())
+            result := keccak256(m, 0xa0)
+        }
     }
 
     /**

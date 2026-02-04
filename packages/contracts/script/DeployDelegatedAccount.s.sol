@@ -41,7 +41,7 @@ contract DeployDelegatedAccount is Script {
         vm.stopBroadcast();
 
         console.log("DelegatedAccount deployed at:", address(delegatedAccount));
-        console.log("Domain Separator:", vm.toString(delegatedAccount.DOMAIN_SEPARATOR()));
+        console.log("Domain Separator:", vm.toString(delegatedAccount.domainSeparator()));
 
         return delegatedAccount;
     }

@@ -68,5 +68,5 @@ interface IDelegatedAccount {
      * @notice Get the EIP-712 domain separator
      * @return The domain separator hash
      */
-    function DOMAIN_SEPARATOR() external view returns (bytes32);
+    function domainSeparator() external view returns (bytes32);
 }

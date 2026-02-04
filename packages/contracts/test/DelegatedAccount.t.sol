@@ -2,10 +2,9 @@
 pragma solidity ^0.8.20;
 
 import { DelegatedAccount } from "../src/DelegatedAccount.sol";
-import { IDelegatedAccount } from "../src/interfaces/IDelegatedAccount.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { MockSmartWallet } from "./mocks/MockSmartWallet.sol";
-import { Test, console } from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
 /**
  * @title MockTarget
@@ -94,7 +93,7 @@ contract DelegatedAccountTest is Test {
             )
         );
 
-        assertEq(delegatedAccount.DOMAIN_SEPARATOR(), expectedDomainSeparator);
+        assertEq(delegatedAccount.domainSeparator(), expectedDomainSeparator);
     }
 
     // ============ Execute Tests ============
@@ -515,7 +514,7 @@ contract DelegatedAccountTest is Test {
         bytes32 structHash =
             keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
 
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", delegatedAccount.DOMAIN_SEPARATOR(), structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", delegatedAccount.domainSeparator(), structHash));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         return abi.encodePacked(r, s, v);
