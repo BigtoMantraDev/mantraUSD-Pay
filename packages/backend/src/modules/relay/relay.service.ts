@@ -53,7 +53,13 @@ export class RelayService {
     }
 
     // 2. Verify deadline
-    const deadline = BigInt(request.intent.deadline);
+    let deadline: bigint;
+    try {
+      deadline = BigInt(request.intent.deadline);
+    } catch (error) {
+      throw new BadRequestException('Invalid deadline format');
+    }
+    
     const now = BigInt(Math.floor(Date.now() / 1000));
     if (deadline <= now) {
       throw new BadRequestException('Intent deadline has expired');
@@ -63,10 +69,17 @@ export class RelayService {
     const digest = this.computeDigest(request);
 
     // 4. Recover signer
-    const recoveredAddress = await recoverAddress({
-      hash: digest,
-      signature: request.signature as `0x${string}`,
-    });
+    let recoveredAddress: string;
+    try {
+      recoveredAddress = await recoverAddress({
+        hash: digest,
+        signature: request.signature as `0x${string}`,
+      });
+    } catch (error) {
+      throw new BadRequestException(
+        `Invalid signature format: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
 
     // 5. Verify signer matches userAddress
     if (recoveredAddress.toLowerCase() !== request.userAddress.toLowerCase()) {

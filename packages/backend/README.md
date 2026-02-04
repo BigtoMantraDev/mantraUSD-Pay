@@ -52,6 +52,22 @@ Copy `.env.example` to `.env` and configure.
 | `DELEGATED_ACCOUNT_ADDRESS` | Deployed DelegatedAccount contract | `0x...`                                      |
 | `TOKEN_ADDRESS`             | mantraUSD token address            | `0xd2b95283011E47257917770D28Bb3EE44c849f6F` |
 
+### Optional Environment Variables
+
+| Variable                 | Description                    | Default |
+|--------------------------|--------------------------------|---------|
+| `PORT`                   | Server port                    | `3000`  |
+| `RATE_LIMIT_TTL`         | Rate limit window (seconds)    | `60`    |
+| `RATE_LIMIT_MAX`         | Max requests per window        | `10`    |
+| `HEALTH_MEMORY_HEAP_MB`  | Memory threshold for health    | `512`   |
+| `MAX_GAS_PRICE_GWEI`     | Max gas price (gwei)           | `100`   |
+| `FEE_ENABLED`            | Enable fee charging            | `true`  |
+| `FEE_MIN`                | Minimum fee (OM)               | `0.01`  |
+| `FEE_MAX`                | Maximum fee (OM)               | `1.00`  |
+| `FEE_BUFFER_PERCENT`     | Fee buffer percentage          | `20`    |
+
+See `.env.example` for complete configuration options.
+
 ## Running the Service
 
 ```bash
