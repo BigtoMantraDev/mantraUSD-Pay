@@ -2,11 +2,11 @@
 
 ## Purpose
 
-**mantraUSD-Pay** is an EIP-7702 Gasless Scan-to-Pay system for MANTRA Chain. It enables merchants to accept mantraUSD payments via QR codes, where customers pay without needing native tokens for gas (gasless UX).
+**mantraUSD-Pay** is an EIP-7702 Gasless Transaction Relay for MANTRA Chain. It enables users to transfer ERC20 tokens and execute arbitrary contract calls without needing native tokens for gas (gasless UX).
 
 ### Key Goals
-- Gasless payments: Users sign, relayer pays gas
-- QR-based merchant payments with session management
+- Gasless transactions: Users sign, relayer pays gas
+- Support ERC20 transfers and any contract calls
 - Dynamic fee calculation based on real-time gas prices
 - Support for MANTRA Mainnet (5888) and Dukong Testnet (5887)
 
@@ -27,7 +27,6 @@
 ### Smart Contracts (packages/contracts)
 - Foundry (Solidity)
 - DelegatedAccount.sol - EIP-7702 implementation
-- SessionRegistry.sol - Payment session management
 
 ### Shared
 - Yarn workspaces (monorepo)
@@ -43,14 +42,13 @@
 
 ### Architecture Patterns
 - **Frontend**: File-based routing with TanStack Router
-- **Backend**: NestJS modules (Session, Relay, Fee, Blockchain)
+- **Backend**: NestJS modules (Relay, Fee, Blockchain)
 - **Contracts**: Stateless delegation pattern (EIP-7702)
 - Single network per backend deployment, chainId validated in requests
 
 ### Testing Strategy
 - Unit tests for services and utilities
 - Integration tests for API endpoints
-- E2E tests for complete payment flows
 - Contract tests with Foundry
 
 ### Git Workflow
@@ -60,19 +58,21 @@
 
 ## Domain Context
 
-### Payment Flow
-1. Merchant creates session (amount, reference, duration)
-2. QR code generated with payment URL
-3. Customer scans, connects wallet, reviews payment
-4. Customer signs EIP-712 typed data (no gas needed)
+### Transaction Flow
+1. User enters transfer details (recipient, amount) or builds contract call
+2. Frontend fetches current fee quote from backend
+3. User reviews total cost and confirms
+4. User signs EIP-712 typed data (no gas needed)
 5. Backend relays EIP-7702 transaction (pays gas)
-6. Session marked fulfilled on-chain
+6. Transaction confirmed on-chain
 
 ### Fee Model
-| Fee Type     | Calculation                  | Recipient      |
-|--------------|------------------------------|----------------|
-| Customer Fee | Dynamic (gas × buffer)       | Relayer        |
-| Merchant Fee | Fixed percentage (bps)       | Fee Collector  |
+| Parameter       | Value          | Description                         |
+|-----------------|----------------|-------------------------------------|
+| Estimated Gas   | 150,000        | Conservative estimate for EIP-7702  |
+| Buffer          | 20%            | Covers gas price volatility         |
+| Max Fee         | 1.00 mantraUSD | Hard cap to protect users           |
+| Min Fee         | 0.01 mantraUSD | Minimum charge when enabled         |
 
 ### Token Information
 | Network        | Address                                      | Symbol    | Decimals |
@@ -81,15 +81,13 @@
 | Testnet (5887) | `0x4B545d0758eda6601B051259bD977125fbdA7ba2` | mmUSD     | 6        |
 
 ### Key Contracts
-- **SessionRegistry**: Payment session CRUD, fee config, fulfillment
 - **DelegatedAccount**: EIP-7702 execution target for gasless txs
 
 ## Important Constraints
 
 - **EIP-7702 Support**: MANTRA Chain must support Type 4 transactions
 - **Fee Quote TTL**: 60 seconds to limit gas price volatility exposure
-- **Max Fees**: Customer fee capped at 1.00 mantraUSD, merchant fee at 5%
-- **Session Duration**: Min 5 minutes, max 24 hours
+- **Max Fee**: 1.00 mantraUSD hard cap
 - **Rate Limiting**: 10 requests/minute/IP on relay endpoint
 
 ## External Dependencies
@@ -104,8 +102,7 @@
 
 ```
 packages/
-├── contracts/     # Foundry smart contracts
-├── webapp/        # Customer payment PWA
-├── backend/       # NestJS API + Relayer
-└── config/        # Shared configuration (future)
+├── contracts/     # Foundry smart contracts (DelegatedAccount.sol)
+├── webapp/        # React frontend
+└── backend/       # NestJS API + Relayer
 ```
