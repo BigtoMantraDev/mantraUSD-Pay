@@ -41,7 +41,7 @@ jobs:
         run: forge test -vvv
 
       - name: Run coverage
-        run: forge coverage --report summary
+        run: forge coverage --report summary --ir-minimum
 
   lint:
     name: Solidity Lint
