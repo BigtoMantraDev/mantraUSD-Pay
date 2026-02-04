@@ -26,16 +26,15 @@ ignore = ["lib/**/*"]
 
 # RPC endpoints configuration
 [rpc_endpoints]
-local = "http://localhost:8545"
-mantra_mainnet = "${MANTRA_MAINNET_RPC_URL}"
-mantra_dukong = "${MANTRA_DUKONG_RPC_URL}"
-mainnet = "${MANTRA_MAINNET_RPC_URL}"  # Alias for mainnet
-dukong = "${MANTRA_DUKONG_RPC_URL}"    # Alias for testnet
+mantra_mainnet = "https://evm.mantrachain.io"
+mantra_dukong = "https://evm.dukong.mantrachain.io"
+mantra_canary = "https://evm.canary.mantrachain.dev"
 
-# Blockscout API configuration (for contract verification)
+# Etherscan configuration for verification (MANTRA Blockscout does not require API key)
 [etherscan]
-mantra_mainnet = { key = "${BLOCKSCOUT_API_KEY}", url = "https://blockscout.mantrascan.io/api" }
-mantra_dukong = { key = "${BLOCKSCOUT_API_KEY}", url = "https://explorer.dukong.io/api" }
+mantra_mainnet = { key = "", url = "https://blockscout.mantrascan.io/" }
+mantra_dukong = { key = "", url = "https://explorer.dukong.io/api" }
+mantra_canary = { key = "", url = "https://blockscout.canary.mantrachain.dev/api" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 

@@ -1,0 +1,132 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packages/backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+defaults:
+  run:
+    working-directory: packages/backend
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set Yarn to Project Version
+        run: corepack prepare yarn@4.12.0 --activate
+
+      - name: Install dependencies
+        run: yarn install --immutable
+        working-directory: .
+
+      - name: Run ESLint
+        run: yarn lint:check
+
+      - name: Check formatting
+        run: yarn format:check
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+        working-directory: .
+
+      - name: Build project
+        run: yarn build
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+        working-directory: .
+
+      - name: Run unit tests
+        run: yarn test --coverage
+        env:
+          NODE_ENV: test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./packages/backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+        working-directory: .
+
+      - name: Run E2E tests
+        run: yarn test:e2e
+        env:
+          NODE_ENV: test
+          # Test environment variables
+          CHAIN_ID: 5887
+          RPC_URL: https://evm.dukong.mantrachain.io
+          RELAYER_PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+          DELEGATED_ACCOUNT_ADDRESS: '0x8DE0E479CA161dA81700f4f0579c3D52Cf691041'
+          TOKEN_ADDRESS: '0xd2b95283011E47257917770D28Bb3EE44c849f6F'
+          RATE_LIMIT_MAX: 100
+          HEALTH_MEMORY_HEAP_MB: 1024

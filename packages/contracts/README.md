@@ -71,14 +71,6 @@ anvil
 ```
 
 2. Deploy contracts:
-```bash
-# From project root
-yarn contracts:deploy:local
-
-# Or from contracts directory
-forge script script/Counter.s.sol:CounterScript --rpc-url local --broadcast
-```
-
 #### Testnet (Dukong)
 
 ```bash
@@ -86,7 +78,7 @@ forge script script/Counter.s.sol:CounterScript --rpc-url local --broadcast
 yarn contracts:deploy:dukong
 
 # Or from contracts directory
-forge script script/Counter.s.sol:CounterScript --rpc-url mantra_dukong --broadcast --verify
+forge script script/DeployDelegatedAccount.s.sol:DeployDelegatedAccount --rpc-url mantra_dukong --broadcast
 ```
 
 #### Mainnet
@@ -96,7 +88,7 @@ forge script script/Counter.s.sol:CounterScript --rpc-url mantra_dukong --broadc
 yarn contracts:deploy:mainnet
 
 # Or from contracts directory
-forge script script/Counter.s.sol:CounterScript --rpc-url mantra_mainnet --broadcast --verify
+forge script script/DeployDelegatedAccount.s.sol:DeployDelegatedAccount --rpc-url mantra_mainnet --broadcast
 ```
 
 ### Contract Verification
