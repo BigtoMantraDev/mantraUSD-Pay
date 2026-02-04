@@ -130,20 +130,3 @@ jobs:
           TOKEN_ADDRESS: '0xd2b95283011E47257917770D28Bb3EE44c849f6F'
           RATE_LIMIT_MAX: 100
           HEALTH_MEMORY_HEAP_MB: 1024
-
-  all-checks:
-    name: All Checks Passed
-    runs-on: ubuntu-latest
-    needs: [lint, type-check, test, e2e]
-    if: always()
-    steps:
-      - name: Check all jobs
-        run: |
-          if [[ "${{ needs.lint.result }}" != "success" ]] || \
-             [[ "${{ needs.type-check.result }}" != "success" ]] || \
-             [[ "${{ needs.test.result }}" != "success" ]] || \
-             [[ "${{ needs.e2e.result }}" != "success" ]]; then
-            echo "One or more checks failed"
-            exit 1
-          fi
-          echo "All checks passed successfully!"
