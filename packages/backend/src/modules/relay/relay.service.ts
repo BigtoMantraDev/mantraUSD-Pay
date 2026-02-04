@@ -57,9 +57,9 @@ export class RelayService {
     try {
       deadline = BigInt(request.intent.deadline);
     } catch (error) {
-      throw new BadRequestException('Invalid deadline format');
+      throw new BadRequestException(`Invalid deadline format: ${error}`);
     }
-    
+
     const now = BigInt(Math.floor(Date.now() / 1000));
     if (deadline <= now) {
       throw new BadRequestException('Intent deadline has expired');

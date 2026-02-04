@@ -5,7 +5,6 @@ import { parseGwei } from 'viem';
 
 describe('GasOracleService', () => {
   let service: GasOracleService;
-  let blockchainService: BlockchainService;
 
   const mockGasPrice = parseGwei('10'); // 10 gwei
   const mockPublicClient = {
@@ -29,7 +28,6 @@ describe('GasOracleService', () => {
     }).compile();
 
     service = module.get<GasOracleService>(GasOracleService);
-    blockchainService = module.get<BlockchainService>(BlockchainService);
   });
 
   afterEach(() => {
@@ -153,13 +151,9 @@ describe('GasOracleService', () => {
     });
 
     it('should propagate errors in isGasPriceAcceptable', async () => {
-      mockPublicClient.getGasPrice.mockRejectedValueOnce(
-        new Error('Timeout'),
-      );
+      mockPublicClient.getGasPrice.mockRejectedValueOnce(new Error('Timeout'));
 
-      await expect(service.isGasPriceAcceptable(20)).rejects.toThrow(
-        'Timeout',
-      );
+      await expect(service.isGasPriceAcceptable(20)).rejects.toThrow('Timeout');
     });
   });
 });

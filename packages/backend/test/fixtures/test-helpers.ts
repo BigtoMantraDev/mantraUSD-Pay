@@ -1,10 +1,5 @@
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
-import {
-  keccak256,
-  encodeAbiParameters,
-  parseAbiParameters,
-  Hex,
-} from 'viem';
+import { keccak256, encodeAbiParameters, parseAbiParameters, Hex } from 'viem';
 
 /**
  * Test wallet fixtures for integration tests
@@ -176,10 +171,10 @@ export const TestContracts = {
  */
 export function createTransferData(to: Hex, amount: bigint): Hex {
   const transferSelector = '0xa9059cbb'; // transfer(address,uint256)
-  const params = encodeAbiParameters(
-    parseAbiParameters('address, uint256'),
-    [to, amount],
-  );
+  const params = encodeAbiParameters(parseAbiParameters('address, uint256'), [
+    to,
+    amount,
+  ]);
   return (transferSelector + params.slice(2)) as Hex;
 }
 
@@ -197,5 +192,9 @@ export function createConcurrentRequests<T>(
   count: number,
   requestFn: () => Promise<T>,
 ): Promise<T[]> {
-  return Promise.all(Array(count).fill(null).map(() => requestFn()));
+  return Promise.all(
+    Array(count)
+      .fill(null)
+      .map(() => requestFn()),
+  );
 }

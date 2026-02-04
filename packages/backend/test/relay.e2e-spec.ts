@@ -8,7 +8,6 @@ import {
 import fastifyCors from '@fastify/cors';
 import { AppModule } from '../src/app.module';
 import { privateKeyToAccount } from 'viem/accounts';
-import { keccak256, encodeAbiParameters, parseAbiParameters } from 'viem';
 
 describe('Relay Module (e2e)', () => {
   let app: NestFastifyApplication;
@@ -145,8 +144,7 @@ describe('Relay Module (e2e)', () => {
 
       const relayRequest = {
         userAddress: testAccount.address,
-        signature:
-          '0x' + '00'.repeat(65), // Dummy signature
+        signature: '0x' + '00'.repeat(65), // Dummy signature
         chainId: 5887,
         intent: {
           destination: '0x0000000000000000000000000000000000000000',
@@ -166,8 +164,7 @@ describe('Relay Module (e2e)', () => {
     it('should reject request with mismatched chainId', async () => {
       const relayRequest = {
         userAddress: testAccount.address,
-        signature:
-          '0x' + '00'.repeat(65),
+        signature: '0x' + '00'.repeat(65),
         chainId: 1, // Wrong chain
         intent: {
           destination: '0x0000000000000000000000000000000000000000',
@@ -187,8 +184,7 @@ describe('Relay Module (e2e)', () => {
     it('should reject request with invalid address', async () => {
       const relayRequest = {
         userAddress: 'not-an-address',
-        signature:
-          '0x' + '00'.repeat(65),
+        signature: '0x' + '00'.repeat(65),
         chainId: 5887,
         intent: {
           destination: '0x0000000000000000000000000000000000000000',
@@ -208,8 +204,7 @@ describe('Relay Module (e2e)', () => {
     it('should reject request with missing intent fields', async () => {
       const relayRequest = {
         userAddress: testAccount.address,
-        signature:
-          '0x' + '00'.repeat(65),
+        signature: '0x' + '00'.repeat(65),
         chainId: 5887,
         intent: {
           destination: '0x0000000000000000000000000000000000000000',
@@ -236,7 +231,10 @@ describe('Relay Module (e2e)', () => {
     });
 
     it('should reject empty body', async () => {
-      await request(app.getHttpServer()).post('/api/relay').send({}).expect(400);
+      await request(app.getHttpServer())
+        .post('/api/relay')
+        .send({})
+        .expect(400);
     });
 
     it('should handle CORS preflight', async () => {
@@ -274,7 +272,9 @@ describe('Relay Module (e2e)', () => {
       // With test env rate limit of 100, we won't hit 429
       // But we verify all requests complete successfully
       expect(responses.length).toBe(12);
-      const validStatuses = responses.every((r) => [400, 429].includes(r.status));
+      const validStatuses = responses.every((r) =>
+        [400, 429].includes(r.status),
+      );
       expect(validStatuses).toBe(true);
     }, 15000);
   });
@@ -284,7 +284,7 @@ describe('Relay Module (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/api/relay')
         .send({});
-      
+
       // With high test limit, expect 400 (validation error)
       // In production with low limit, might get 429
       expect([400, 429]).toContain(response.status);
@@ -311,10 +311,7 @@ describe('Relay Module (e2e)', () => {
     });
 
     it('should handle unsupported HTTP methods', async () => {
-      await request(app.getHttpServer())
-        .put('/api/relay')
-        .send({})
-        .expect(404);
+      await request(app.getHttpServer()).put('/api/relay').send({}).expect(404);
     });
   });
 });

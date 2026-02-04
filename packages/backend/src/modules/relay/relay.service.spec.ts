@@ -9,7 +9,6 @@ import { BlockchainService } from '../blockchain/blockchain.service';
 import { RelayerWalletService } from '../blockchain/relayer-wallet.service';
 import { GasOracleService } from '../blockchain/gas-oracle.service';
 import { RelayRequestDto } from './dto/relay-request.dto';
-import { keccak256 } from 'viem';
 
 // Mock viem functions
 jest.mock('viem', () => ({
@@ -25,9 +24,6 @@ import { recoverAddress } from 'viem';
 
 describe('RelayService', () => {
   let service: RelayService;
-  let configService: ConfigService;
-  let blockchainService: BlockchainService;
-  let relayerWalletService: RelayerWalletService;
   let gasOracleService: GasOracleService;
 
   const mockChainId = 5887;
@@ -107,10 +103,6 @@ describe('RelayService', () => {
     }).compile();
 
     service = module.get<RelayService>(RelayService);
-    configService = module.get<ConfigService>(ConfigService);
-    blockchainService = module.get<BlockchainService>(BlockchainService);
-    relayerWalletService =
-      module.get<RelayerWalletService>(RelayerWalletService);
     gasOracleService = module.get<GasOracleService>(GasOracleService);
   });
 

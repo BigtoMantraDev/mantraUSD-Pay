@@ -123,8 +123,7 @@ describe('NonceService', () => {
     });
 
     it('should reject address without 0x prefix', async () => {
-      const addressWithoutPrefix =
-        'f39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+      const addressWithoutPrefix = 'f39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
       await expect(service.getNonce(addressWithoutPrefix)).rejects.toThrow(
         BadRequestException,
@@ -292,7 +291,8 @@ describe('NonceService', () => {
     });
 
     it('should handle different delegated account addresses', async () => {
-      const differentAddress = '0x9999999999999999999999999999999999999999' as `0x${string}`;
+      const differentAddress =
+        '0x9999999999999999999999999999999999999999' as `0x${string}`;
       const localMockConfigService = {
         get: jest.fn().mockReturnValue(differentAddress),
       };

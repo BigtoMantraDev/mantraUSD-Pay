@@ -40,7 +40,7 @@ export class HealthController {
   check() {
     const memoryHeapMB = this.configService.get<number>('health.memoryHeapMB')!;
     const memoryHeapBytes = memoryHeapMB * 1024 * 1024;
-    
+
     return this.health.check([
       // Check memory usage (heap threshold)
       // Configurable via HEALTH_MEMORY_HEAP_MB env var (default: 512MB)

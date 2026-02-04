@@ -6,7 +6,6 @@ import { parseGwei } from 'viem';
 
 describe('FeeService', () => {
   let service: FeeService;
-  let configService: ConfigService;
   let gasOracleService: GasOracleService;
 
   const mockGasPrice = parseGwei('10');
@@ -34,7 +33,9 @@ describe('FeeService', () => {
     jest.clearAllMocks();
 
     // Restore default mock implementations after clearAllMocks
-    mockConfigService.get.mockImplementation((key: string) => mockConfigValues[key]);
+    mockConfigService.get.mockImplementation(
+      (key: string) => mockConfigValues[key],
+    );
     mockGasOracleService.getGasPrice.mockResolvedValue(mockGasPrice);
     mockGasOracleService.getGasPriceGwei.mockResolvedValue('10');
 
@@ -53,7 +54,6 @@ describe('FeeService', () => {
     }).compile();
 
     service = module.get<FeeService>(FeeService);
-    configService = module.get<ConfigService>(ConfigService);
     gasOracleService = module.get<GasOracleService>(GasOracleService);
   });
 
@@ -83,7 +83,7 @@ describe('FeeService', () => {
 
     it('should calculate fee with buffer applied', async () => {
       const quote = await service.getFeeQuote();
-      
+
       // Gas cost = 10 gwei * 150000 = 1,500,000 gwei = 0.0015 ether
       // With 20% buffer = 0.0018 ether
       // Convert to 6 decimals = 0.001800 tokens
@@ -149,7 +149,9 @@ describe('FeeService', () => {
   describe('fee caps', () => {
     it('should apply minimum fee cap', async () => {
       // Set very low gas price to trigger min cap
-      mockGasOracleService.getGasPrice.mockResolvedValueOnce(parseGwei('0.001'));
+      mockGasOracleService.getGasPrice.mockResolvedValueOnce(
+        parseGwei('0.001'),
+      );
       mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('0.001');
 
       const quote = await service.getFeeQuote();
@@ -158,7 +160,9 @@ describe('FeeService', () => {
 
     it('should apply maximum fee cap', async () => {
       // Set very high gas price to trigger max cap
-      mockGasOracleService.getGasPrice.mockResolvedValueOnce(parseGwei('10000'));
+      mockGasOracleService.getGasPrice.mockResolvedValueOnce(
+        parseGwei('10000'),
+      );
       mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('10000');
 
       const quote = await service.getFeeQuote();
@@ -169,7 +173,7 @@ describe('FeeService', () => {
       // Use normal gas price that should result in fee within min/max
       const quote = await service.getFeeQuote();
       const feeValue = parseFloat(quote.fee);
-      
+
       // Fee should be within bounds but not necessarily at the caps
       expect(feeValue).toBeGreaterThanOrEqual(0.01);
       expect(feeValue).toBeLessThanOrEqual(1.0);
@@ -181,7 +185,9 @@ describe('FeeService', () => {
         return mockConfigValues[key];
       });
 
-      mockGasOracleService.getGasPrice.mockResolvedValueOnce(parseGwei('0.001'));
+      mockGasOracleService.getGasPrice.mockResolvedValueOnce(
+        parseGwei('0.001'),
+      );
       mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('0.001');
 
       const quote = await service.getFeeQuote();
@@ -194,7 +200,9 @@ describe('FeeService', () => {
         return mockConfigValues[key];
       });
 
-      mockGasOracleService.getGasPrice.mockResolvedValueOnce(parseGwei('10000'));
+      mockGasOracleService.getGasPrice.mockResolvedValueOnce(
+        parseGwei('10000'),
+      );
       mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('10000');
 
       const quote = await service.getFeeQuote();
@@ -268,10 +276,10 @@ describe('FeeService', () => {
   describe('multiple quotes', () => {
     it('should return different expiry times for sequential calls', async () => {
       const quote1 = await service.getFeeQuote();
-      
+
       // Wait a bit to ensure time difference
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       const quote2 = await service.getFeeQuote();
       expect(quote2.expiresAt).toBeGreaterThanOrEqual(quote1.expiresAt);
     });

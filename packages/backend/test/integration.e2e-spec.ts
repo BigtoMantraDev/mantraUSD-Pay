@@ -57,7 +57,6 @@ describe('Integration Tests', () => {
         .expect(200);
 
       expect(feeResponse.body.fee).toBeDefined();
-      const fee = feeResponse.body.fee;
 
       // Step 2: Get current nonce
       const nonceResponse = await request(app.getHttpServer())
@@ -224,7 +223,10 @@ describe('Integration Tests', () => {
 
       expect(response.body).toHaveProperty('statusCode');
       expect(response.body).toHaveProperty('message');
-      expect(Array.isArray(response.body.message) || typeof response.body.message === 'string').toBe(true);
+      expect(
+        Array.isArray(response.body.message) ||
+          typeof response.body.message === 'string',
+      ).toBe(true);
     });
 
     it('should handle RPC failures gracefully', async () => {
@@ -268,7 +270,7 @@ describe('Integration Tests', () => {
             });
           responses.push(response);
           await delay(10);
-        } catch (error) {
+        } catch {
           // Ignore connection errors
         }
       }
@@ -380,9 +382,8 @@ describe('Integration Tests', () => {
 
   describe('Health Check Integration', () => {
     it('should return healthy status when relayer is operational', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/health');
-      
+      const response = await request(app.getHttpServer()).get('/api/health');
+
       // Accept 200 (healthy) or 503 (memory threshold exceeded in tests)
       expect([200, 503]).toContain(response.status);
 
@@ -392,9 +393,8 @@ describe('Integration Tests', () => {
     });
 
     it('should include all health indicators', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/health');
-      
+      const response = await request(app.getHttpServer()).get('/api/health');
+
       // Accept 200 (healthy) or 503 (memory threshold exceeded in tests)
       expect([200, 503]).toContain(response.status);
 
