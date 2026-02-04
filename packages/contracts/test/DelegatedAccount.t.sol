@@ -134,7 +134,7 @@ contract DelegatedAccountTest is Test {
         // The signature will recover to user's address, which won't match owner
         bytes memory signature = _signExecute(
             userPrivateKey, // Signer
-            owner,          // Account in signature (won't match recovered signer)
+            owner, // Account in signature (won't match recovered signer)
             destination,
             value,
             data,
@@ -382,7 +382,7 @@ contract DelegatedAccountTest is Test {
 
     function test_Execute_WithETHValue() public {
         MockTarget mockTarget = new MockTarget();
-        
+
         // Fund the DelegatedAccount contract with ETH
         vm.deal(address(delegatedAccount), 10 ether);
 
@@ -409,7 +409,7 @@ contract DelegatedAccountTest is Test {
 
     function test_Execute_InsufficientETH() public {
         MockTarget mockTarget = new MockTarget();
-        
+
         // Don't fund the contract - it has 0 ETH
 
         address destination = address(mockTarget);
@@ -423,7 +423,7 @@ contract DelegatedAccountTest is Test {
         // Should fail due to insufficient balance
         vm.expectRevert();
         delegatedAccount.execute(owner, destination, value, data, nonce, deadline, signature);
-        
+
         // Nonce should not increment on failure
         assertEq(delegatedAccount.getNonce(owner), 0, "Nonce should not increment on failure");
     }
@@ -434,7 +434,7 @@ contract DelegatedAccountTest is Test {
         uint256 balanceBefore = address(delegatedAccount).balance;
 
         // Send ETH to the contract
-        (bool success,) = address(delegatedAccount).call{value: sendAmount}("");
+        (bool success,) = address(delegatedAccount).call{ value: sendAmount }("");
         assertTrue(success, "ETH transfer should succeed");
 
         assertEq(address(delegatedAccount).balance, balanceBefore + sendAmount, "Contract should receive ETH");
@@ -443,7 +443,7 @@ contract DelegatedAccountTest is Test {
     function test_Execute_ETHTransferToEOA() public {
         // Test sending ETH to an EOA (not a contract)
         address payable ethRecipient = payable(makeAddr("ethRecipient"));
-        
+
         // Fund the DelegatedAccount contract with ETH
         vm.deal(address(delegatedAccount), 10 ether);
 
@@ -512,7 +512,8 @@ contract DelegatedAccountTest is Test {
         view
         returns (bytes memory)
     {
-        bytes32 structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
+        bytes32 structHash =
+            keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
 
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", delegatedAccount.DOMAIN_SEPARATOR(), structHash));
 

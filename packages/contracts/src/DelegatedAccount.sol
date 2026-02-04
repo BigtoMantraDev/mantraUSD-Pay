@@ -5,8 +5,8 @@ import { IDelegatedAccount } from "./interfaces/IDelegatedAccount.sol";
 import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /**
  * @title DelegatedAccount
@@ -93,7 +93,8 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
         if (nonce != _nonces[account]) revert InvalidNonce();
 
         // Verify signature - the signature must be from the account parameter
-        bytes32 structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
+        bytes32 structHash =
+            keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, keccak256(data), nonce, deadline));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
 
         if (!_isValidSignature(account, digest, signature)) {
