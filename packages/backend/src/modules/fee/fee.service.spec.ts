@@ -34,6 +34,7 @@ describe('FeeService', () => {
     jest.clearAllMocks();
 
     // Restore default mock implementations after clearAllMocks
+    mockConfigService.get.mockImplementation((key: string) => mockConfigValues[key]);
     mockGasOracleService.getGasPrice.mockResolvedValue(mockGasPrice);
     mockGasOracleService.getGasPriceGwei.mockResolvedValue('10');
 
@@ -264,36 +265,25 @@ describe('FeeService', () => {
     });
   });
 
-  describe.skip('multiple quotes', () => {
-    // NOTE: Skipped due to jest.clearAllMocks() interaction issues
-    // Core functionality is already tested in other test cases
-    beforeAll(() => {
-      mockGasOracleService.getGasPrice.mockResolvedValue(mockGasPrice);
-      mockGasOracleService.getGasPriceGwei.mockResolvedValue('10');
-    });
-
-    it('should return different expiry times for sequential calls', (done) => {
-      service.getFeeQuote().then((quote1) => {
-        setTimeout(() => {
-          service.getFeeQuote().then((quote2) => {
-            expect(quote2.expiresAt).toBeGreaterThanOrEqual(quote1.expiresAt);
-            done();
-          });
-        }, 1000);
-      });
+  describe('multiple quotes', () => {
+    it('should return different expiry times for sequential calls', async () => {
+      const quote1 = await service.getFeeQuote();
+      
+      // Wait a bit to ensure time difference
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const quote2 = await service.getFeeQuote();
+      expect(quote2.expiresAt).toBeGreaterThanOrEqual(quote1.expiresAt);
     });
 
     it('should reflect gas price changes', async () => {
-      // Reset mocks explicitly for this test
-      mockGasOracleService.getGasPrice.mockResolvedValue(mockGasPrice);
-      mockGasOracleService.getGasPriceGwei.mockResolvedValue('10');
-      
       const quote1 = await service.getFeeQuote();
+      expect(quote1.gasPriceGwei).toBe('10');
 
-      // Change gas price
+      // Change gas price for next call
       const higherGasPrice = parseGwei('20');
-      mockGasOracleService.getGasPrice.mockResolvedValue(higherGasPrice);
-      mockGasOracleService.getGasPriceGwei.mockResolvedValue('20');
+      mockGasOracleService.getGasPrice.mockResolvedValueOnce(higherGasPrice);
+      mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('20');
 
       const quote2 = await service.getFeeQuote();
       expect(quote2.gasPrice).toBe(higherGasPrice.toString());
