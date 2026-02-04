@@ -8,7 +8,6 @@ optimizer_runs = 200
 
 remappings = [
     "forge-std/=lib/forge-std/src/",
-    # Reference: https://docs.openzeppelin.com/upgrades-plugins/foundry/foundry-upgrades
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
 ]
 
