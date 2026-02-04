@@ -441,7 +441,7 @@ contract DelegatedAccountTest is Test {
 
     function test_Execute_ETHTransferToEOA() public {
         // Test sending ETH to an EOA (not a contract)
-        address payable recipient2 = payable(makeAddr("ethRecipient"));
+        address payable ethRecipient = payable(makeAddr("ethRecipient"));
         
         // Fund the DelegatedAccount contract with ETH
         vm.deal(address(delegatedAccount), 10 ether);
@@ -451,17 +451,17 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes memory signature = _signExecute(ownerPrivateKey, owner, recipient2, value, data, nonce, deadline);
+        bytes memory signature = _signExecute(ownerPrivateKey, owner, ethRecipient, value, data, nonce, deadline);
 
         uint256 contractBalanceBefore = address(delegatedAccount).balance;
-        uint256 recipientBalanceBefore = recipient2.balance;
+        uint256 recipientBalanceBefore = ethRecipient.balance;
 
         // Execute ETH transfer
-        delegatedAccount.execute(owner, recipient2, value, data, nonce, deadline, signature);
+        delegatedAccount.execute(owner, ethRecipient, value, data, nonce, deadline, signature);
 
         // Verify ETH was transferred
         assertEq(address(delegatedAccount).balance, contractBalanceBefore - value, "Contract ETH balance should decrease");
-        assertEq(recipient2.balance, recipientBalanceBefore + value, "Recipient should receive ETH");
+        assertEq(ethRecipient.balance, recipientBalanceBefore + value, "Recipient should receive ETH");
     }
 
     // ============ Nonce Tests ============

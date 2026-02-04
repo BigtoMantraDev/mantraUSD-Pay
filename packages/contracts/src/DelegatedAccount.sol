@@ -100,16 +100,18 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
             revert InvalidSignature();
         }
 
-        // Execute call (before incrementing nonce to maintain CEI pattern)
-        // Note: We keep the external call after nonce check but before increment
-        // to ensure failed transactions don't consume nonces
+        // Execute call
+        // Note: With nonReentrant protection, we execute first then update state
+        // If the call fails, the entire transaction reverts (including nonce check)
+        // ensuring failed transactions don't consume nonces
         (bool success, bytes memory returnData) = destination.call{ value: value }(data);
 
         if (!success) {
             revert ExecutionFailed(returnData);
         }
 
-        // Increment nonce after successful execution (CEI pattern)
+        // Increment nonce only after successful execution
+        // This ensures nonces are only consumed for successful transactions
         _nonces[account] = nonce + 1;
 
         emit Executed(account, destination, value, nonce, success);
