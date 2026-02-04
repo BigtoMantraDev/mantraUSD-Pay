@@ -12,9 +12,6 @@ on:
       - "packages/contracts/**"
       - ".github/workflows/contracts.yml"
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   test:
     name: Foundry Tests
