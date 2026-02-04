@@ -35,7 +35,9 @@ jobs:
         run: forge --version
 
       - name: Install dependencies
-        run: forge install
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts --no-commit
+          forge install
 
       - name: Build contracts
         run: forge build --sizes
