@@ -34,11 +34,6 @@ jobs:
       - name: Show Forge version
         run: forge --version
 
-      - name: Install dependencies
-        run: |
-          forge install OpenZeppelin/openzeppelin-contracts
-          forge install
-
       - name: Build contracts
         run: forge build --sizes
 
