@@ -130,10 +130,11 @@ contract DelegatedAccountTest is Test {
         uint256 nonce = 0;
         uint256 deadline = block.timestamp + 1 hours;
 
-        // Sign with wrong key - user signs but we try to execute for owner's account
+        // Sign with user's key, but try to execute for owner's account
+        // The signature will recover to user's address, which won't match owner
         bytes memory signature = _signExecute(
-            userPrivateKey, // Wrong signer
-            owner,          // Trying to execute for owner
+            userPrivateKey, // Signer
+            owner,          // Account in signature (won't match recovered signer)
             destination,
             value,
             data,

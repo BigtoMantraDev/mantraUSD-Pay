@@ -100,9 +100,8 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
             revert InvalidSignature();
         }
 
-        // Execute call
-        // Note: With nonReentrant protection, we execute first then update state
-        // If the call fails, we revert below, preventing nonce increment
+        // Execute call then update state
+        // The nonce is incremented after execution to ensure failed calls don't consume nonces
         (bool success, bytes memory returnData) = destination.call{ value: value }(data);
 
         if (!success) {
@@ -110,7 +109,6 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
         }
 
         // Increment nonce only after successful execution
-        // If execution failed, we reverted above before reaching this line
         _nonces[account] = nonce + 1;
 
         emit Executed(account, destination, value, nonce, success);
