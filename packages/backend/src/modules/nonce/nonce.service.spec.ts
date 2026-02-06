@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NonceService } from './nonce.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { getAddress } from 'viem';
 
 describe('NonceService', () => {
   let service: NonceService;
-  let configService: ConfigService;
   let blockchainService: BlockchainService;
 
   const mockDelegatedAccountAddress =
@@ -52,7 +50,6 @@ describe('NonceService', () => {
     }).compile();
 
     service = module.get<NonceService>(NonceService);
-    configService = module.get<ConfigService>(ConfigService);
     blockchainService = module.get<BlockchainService>(BlockchainService);
   });
 

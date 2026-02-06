@@ -254,7 +254,7 @@ describe('FeeService', () => {
     });
 
     it('should use different cache keys for different parameters', async () => {
-      const quote1 = await service.getFeeQuote(mockFeeQuoteRequest);
+      await service.getFeeQuote(mockFeeQuoteRequest);
 
       const differentRequest: FeeQuoteRequestDto = {
         ...mockFeeQuoteRequest,
@@ -264,7 +264,7 @@ describe('FeeService', () => {
       mockGasOracleService.estimateExecuteGas.mockClear();
       mockGasOracleService.getGasPrice.mockClear();
 
-      const quote2 = await service.getFeeQuote(differentRequest);
+      await service.getFeeQuote(differentRequest);
 
       // Should make new RPC calls for different parameters
       expect(mockGasOracleService.estimateExecuteGas).toHaveBeenCalled();
