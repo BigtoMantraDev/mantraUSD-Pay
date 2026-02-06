@@ -19,6 +19,13 @@ import {
 describe('Integration Tests', () => {
   let app: NestFastifyApplication;
 
+  const testParams = {
+    token: '0x4B545d0758eda6601B051259bD977125fbdA7ba2',
+    amount: '1000000',
+    recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5',
+    sender: '0x1234567890123456789012345678901234567890',
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -54,9 +61,11 @@ describe('Integration Tests', () => {
       // Step 1: Get fee quote
       const feeResponse = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
-      expect(feeResponse.body.fee).toBeDefined();
+      expect(feeResponse.body.feeAmount).toBeDefined();
+      expect(feeResponse.body.signature).toBeDefined();
 
       // Step 2: Get current nonce
       const nonceResponse = await request(app.getHttpServer())
@@ -420,6 +429,7 @@ describe('Integration Tests', () => {
     it('should include CORS headers in responses', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .set('Origin', 'http://localhost:3000')
         .expect(200);
 

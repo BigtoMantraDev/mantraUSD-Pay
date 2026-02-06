@@ -11,6 +11,13 @@ import { AppModule } from '../src/app.module';
 describe('Fee Module (e2e)', () => {
   let app: NestFastifyApplication;
 
+  const testParams = {
+    token: '0x4B545d0758eda6601B051259bD977125fbdA7ba2',
+    amount: '1000000',
+    recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5',
+    sender: '0x1234567890123456789012345678901234567890',
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -43,90 +50,96 @@ describe('Fee Module (e2e)', () => {
     it('should return fee quote with correct structure', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
-      expect(response.body).toHaveProperty('fee');
-      expect(response.body).toHaveProperty('feeFormatted');
-      expect(response.body).toHaveProperty('gasPrice');
-      expect(response.body).toHaveProperty('gasPriceGwei');
-      expect(response.body).toHaveProperty('estimatedGas');
-      expect(response.body).toHaveProperty('bufferPercent');
-      expect(response.body).toHaveProperty('expiresAt');
-      expect(response.body).toHaveProperty('enabled');
+      expect(response.body).toHaveProperty('feeAmount');
+      expect(response.body).toHaveProperty('feeToken');
+      expect(response.body).toHaveProperty('deadline');
+      expect(response.body).toHaveProperty('signature');
     });
 
     it('should return valid fee values', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
-      const { fee, estimatedGas, bufferPercent, expiresAt } = response.body;
+      const { feeAmount, feeToken, deadline, signature } = response.body;
 
-      // Fee should be a numeric string
-      expect(parseFloat(fee)).toBeGreaterThan(0);
+      // Fee amount should be a numeric string
+      expect(BigInt(feeAmount)).toBeGreaterThan(0n);
 
-      // Estimated gas should be a positive number
-      expect(estimatedGas).toBeGreaterThan(0);
+      // Fee token should be a valid address
+      expect(feeToken).toMatch(/^0x[0-9a-fA-F]{40}$/);
 
-      // Buffer should be reasonable (0-100%)
-      expect(bufferPercent).toBeGreaterThanOrEqual(0);
-      expect(bufferPercent).toBeLessThanOrEqual(100);
-
-      // Expiration should be in the future
+      // Deadline should be in the future
       const now = Math.floor(Date.now() / 1000);
-      expect(expiresAt).toBeGreaterThan(now);
+      expect(deadline).toBeGreaterThan(now);
+
+      // Signature should be a valid hex string
+      expect(signature).toMatch(/^0x[0-9a-fA-F]+$/);
     });
 
-    it('should include formatted fee with token symbol', async () => {
+    it('should return feeToken as configured token address', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
-      expect(response.body.feeFormatted).toContain(response.body.fee);
-      expect(response.body.feeFormatted).toMatch(/mantraUSD/);
+      expect(response.body.feeToken).toBeDefined();
+      expect(response.body.feeToken).toMatch(/^0x[0-9a-fA-F]{40}$/);
     });
 
-    it('should return gas price in both wei and gwei', async () => {
+    it('should return signature for verification', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
-      // Gas price should be a numeric string
-      expect(response.body.gasPrice).toBeDefined();
-      expect(BigInt(response.body.gasPrice)).toBeGreaterThan(0n);
-
-      // Gas price in gwei should be a numeric string
-      expect(response.body.gasPriceGwei).toBeDefined();
-      expect(parseFloat(response.body.gasPriceGwei)).toBeGreaterThan(0);
+      expect(response.body.signature).toBeDefined();
+      expect(response.body.signature).toMatch(/^0x[0-9a-fA-F]+$/);
     });
 
     it('should enforce minimum fee cap', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
-      const fee = parseFloat(response.body.fee);
-      expect(fee).toBeGreaterThanOrEqual(0.01);
+      const feeAmount = BigInt(response.body.feeAmount);
+      // Min fee is 0.01 tokens with 6 decimals = 10000 wei
+      const minFeeWei = BigInt(10000);
+      expect(feeAmount).toBeGreaterThanOrEqual(minFeeWei);
     });
 
     it('should enforce maximum fee cap', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
-      const fee = parseFloat(response.body.fee);
-      expect(fee).toBeLessThanOrEqual(1.0);
+      const feeAmount = BigInt(response.body.feeAmount);
+      // Max fee is 1.0 tokens with 6 decimals = 1000000 wei
+      const maxFeeWei = BigInt(1000000);
+      expect(feeAmount).toBeLessThanOrEqual(maxFeeWei);
     });
 
     it('should return consistent structure on multiple requests', async () => {
       const response1 = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .expect(200);
 
       const response2 = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query({
+          ...testParams,
+          recipient: '0x0000000000000000000000000000000000000002',
+        })
         .expect(200);
 
+      // Both responses should have the same structure
       expect(Object.keys(response1.body).sort()).toEqual(
         Object.keys(response2.body).sort(),
       );
@@ -135,6 +148,7 @@ describe('Fee Module (e2e)', () => {
     it('should handle CORS headers', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/fees/quote')
+        .query(testParams)
         .set('Origin', 'http://localhost:3000')
         .expect(200);
 
@@ -143,7 +157,10 @@ describe('Fee Module (e2e)', () => {
 
     it('should respond quickly (< 2 seconds)', async () => {
       const start = Date.now();
-      await request(app.getHttpServer()).get('/api/fees/quote').expect(200);
+      await request(app.getHttpServer())
+        .get('/api/fees/quote')
+        .query(testParams)
+        .expect(200);
       const duration = Date.now() - start;
 
       expect(duration).toBeLessThan(2000);
