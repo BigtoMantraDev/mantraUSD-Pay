@@ -35,18 +35,31 @@ A modern React-based template for building decentralized applications on EVM cha
 | `TransactionDialog`          | Single-step transaction flow                       |
 | `WalletConnectPill`          | Custom AppKit wrapper with popover                 |
 
+### Feature Components (`@/components/features`)
+
+| Component       | Purpose                                               |
+| --------------- | ----------------------------------------------------- |
+| `FaucetCard`    | Example faucet component (template demo)              |
+| `FeeDisplay`    | Displays gasless transfer fee quote with countdown    |
+| `RelayStatus`   | Transaction progress indicator (signing → success)    |
+| `TransferForm`  | Complete gasless transfer form with validation        |
+
 ### Hooks (`@/hooks`)
 
-| Hook                 | Purpose                                |
-| -------------------- | -------------------------------------- |
-| `useAppConfig`       | Chain config with explorer URL helpers |
-| `useTransactionFlow` | Transaction state machine              |
-| `useTokenBalance`    | Fetch ERC20/native token balance       |
-| `useTokenAllowance`  | Check ERC20 allowance for spender      |
-| `useDebounce`        | Debounce values for search/input       |
-| `useLocalStorage`    | Persisted state with cross-tab sync    |
-| `useMediaQuery`      | CSS media query hook                   |
-| `useBreakpoints`     | Tailwind-aligned breakpoint states     |
+| Hook                   | Purpose                                      |
+| ---------------------- | -------------------------------------------- |
+| `useAppConfig`         | Chain config with explorer URL helpers       |
+| `useTransactionFlow`   | Transaction state machine                    |
+| `useTokenBalance`      | Fetch ERC20/native token balance             |
+| `useTokenAllowance`    | Check ERC20 allowance for spender            |
+| `useFeeQuote`          | Fetch gasless transfer fee quote from backend|
+| `useNonce`             | Read on-chain nonce from DelegatedAccount    |
+| `useEIP712Sign`        | Sign ExecuteData with EIP-712 typed data     |
+| `useRelayTransaction`  | Submit signed transaction to relayer         |
+| `useDebounce`          | Debounce values for search/input             |
+| `useLocalStorage`      | Persisted state with cross-tab sync          |
+| `useMediaQuery`        | CSS media query hook                         |
+| `useBreakpoints`       | Tailwind-aligned breakpoint states           |
 
 ### Feature Components (`@/components/features`)
 
@@ -181,4 +194,61 @@ src/
 ```bash
 # Required for wallet connection
 VITE_REOWN_PROJECT_ID=your_project_id
+
+# Optional: Override backend URL for gasless transfers
+# Default URLs by network:
+# - Local: http://localhost:3001
+# - Dukong: https://relayer-dukong.mantrachain.io
+# - Mainnet: https://relayer.mantrachain.io
+VITE_BACKEND_URL=http://localhost:3001
 ```
+
+## Gasless Transfer Feature
+
+The template includes a complete gasless transfer implementation using EIP-712 signatures and a backend relayer service:
+
+### How It Works
+
+1. **User Action**: User specifies token amount and recipient
+2. **Fee Quote**: Frontend fetches fee quote from backend (`/fee/quote`)
+3. **Nonce Lookup**: Read user's nonce from DelegatedAccount contract
+4. **EIP-712 Signature**: User signs ExecuteData (no gas required)
+5. **Relay**: Backend submits transaction and pays gas fees
+6. **Confirmation**: Transaction hash returned, user can track on explorer
+
+### Components
+
+- **`FeeDisplay`**: Shows fee amount, expiration countdown, and refresh button
+- **`TransferForm`**: Complete form with validation, balance checks, and signature flow
+- **`RelayStatus`**: Progress indicator (signing → relaying → success/error)
+
+### Hooks
+
+- **`useFeeQuote`**: Fetch fee quote from backend with 10s caching
+- **`useNonce`**: Read on-chain nonce for replay protection
+- **`useEIP712Sign`**: Sign ExecuteData with EIP-712 typed data
+- **`useRelayTransaction`**: Submit signed transaction to relayer
+
+### Routes
+
+- **`/`**: Home page with feature explanation and quick links
+- **`/transfer`**: Full transfer page with TransferForm
+
+### Configuration
+
+Set `delegatedAccount` contract address and `backend.url` in chain configs:
+
+```typescript
+// src/config/networks/local.ts
+export const localConfig: ChainConfig = {
+  // ...
+  contracts: {
+    delegatedAccount: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+  },
+  backend: {
+    url: 'http://localhost:3001',
+  },
+};
+```
+
+See [OpenSpec docs](../../openspec/changes/add-transfer-ui/) for complete implementation details.

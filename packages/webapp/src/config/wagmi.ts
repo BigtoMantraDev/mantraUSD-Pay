@@ -20,9 +20,7 @@ const networks = import.meta.env.DEV
 
 // Create Wagmi adapter
 const wagmiAdapter = new WagmiAdapter({
-  networks: networks as unknown as Parameters<
-    typeof WagmiAdapter
-  >[0]['networks'],
+  networks: networks as any,
   projectId,
 });
 

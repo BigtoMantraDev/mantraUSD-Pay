@@ -8,14 +8,18 @@ import '@/config/wagmi';
 import './index.css';
 import { routeTree } from './routeTree.gen';
 
-// Conditionally import dev routes - tree-shaken in production
+// Create router - TanStack Router plugin handles all file-based routes
 async function createAppRouter() {
+  // Dev routes (_dev/*) are excluded from auto-generation via routeFileIgnorePattern
+  // and manually registered below when in development mode
   if (import.meta.env.DEV) {
-    // Dynamic import ensures tree-shaking in production
     const { devRoutes } = await import('./routes/_dev');
-    // Add dev routes as children of the root route
-    const routeTreeWithDevRoutes = routeTree.addChildren(devRoutes);
-    return createRouter({ routeTree: routeTreeWithDevRoutes });
+    const router = createRouter({ routeTree });
+    // Register dev routes as additional children
+    devRoutes.forEach((route) => {
+      router.routeTree.addChildren([route]);
+    });
+    return router;
   }
   return createRouter({ routeTree });
 }

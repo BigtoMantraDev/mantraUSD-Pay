@@ -22,6 +22,11 @@ export const mantraDukongConfig: ChainConfig = {
     omToken: '0x0000000000000000000000000000000000000000',
     stakingPool: '0x0000000000000000000000000000000000000000',
     migrationHelper: '0x0000000000000000000000000000000000000000',
+    delegatedAccount: '0x4e7F587DbDb8424e20E9F7F84d3173fA32F22B4F',
+    mantraUSD: '0x4B545d0758eda6601B051259bD977125fbdA7ba2',
+  },
+  backend: {
+    url: 'http://localhost:3000/api',
   },
   ui: {
     color: 'yellow-500',

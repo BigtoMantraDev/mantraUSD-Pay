@@ -4,6 +4,24 @@ import { mantraMainnetConfig } from './networks/mantra-mainnet';
 import { type ChainConfig } from './types';
 
 /**
+ * Apply environment variable overrides to chain configs
+ * Allows runtime configuration without rebuilding
+ */
+function applyEnvOverrides(config: ChainConfig): ChainConfig {
+  const backendUrlOverride = import.meta.env.VITE_BACKEND_URL;
+  if (backendUrlOverride) {
+    return {
+      ...config,
+      backend: {
+        ...config.backend,
+        url: backendUrlOverride,
+      },
+    };
+  }
+  return config;
+}
+
+/**
  * Array of supported chains for Wagmi/AppKit configuration
  */
 export const SUPPORTED_CHAINS = [
@@ -15,11 +33,12 @@ export const SUPPORTED_CHAINS = [
 /**
  * Map of chain ID to full configuration
  * Use this for app logic lookups (contracts, explorer URLs, etc.)
+ * Environment variables (VITE_BACKEND_URL) can override defaults
  */
 export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
-  [mantraMainnetConfig.chainId]: mantraMainnetConfig,
-  [mantraDukongConfig.chainId]: mantraDukongConfig,
-  [localConfig.chainId]: localConfig,
+  [mantraMainnetConfig.chainId]: applyEnvOverrides(mantraMainnetConfig),
+  [mantraDukongConfig.chainId]: applyEnvOverrides(mantraDukongConfig),
+  [localConfig.chainId]: applyEnvOverrides(localConfig),
 };
 
 /**
