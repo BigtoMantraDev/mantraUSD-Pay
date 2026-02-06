@@ -59,15 +59,17 @@ export function TransferForm({
     owner: userAddress,
     tokenAddress,
   });
-  const { data: nonce, isLoading: nonceLoading, error: nonceError } = useNonce(userAddress);
+  const {
+    data: nonce,
+    isLoading: nonceLoading,
+    error: nonceError,
+  } = useNonce(userAddress);
   const { signExecuteData } = useEIP712Sign();
   const relayMutation = useRelayTransaction();
   const {
     getOrSignAuthorization,
     getCachedAuthorization,
-    needsAuthorization,
     isSupported: authSupported,
-    isLoading: authLoading,
   } = useSignAuthorization();
 
   // Validation
@@ -86,11 +88,11 @@ export function TransferForm({
 
   // Calculate total (amount + fee)
   const totalAmount =
-    amountWei && feeQuote
-      ? amountWei + BigInt(feeQuote.feeAmount)
-      : undefined;
+    amountWei && feeQuote ? amountWei + BigInt(feeQuote.feeAmount) : undefined;
   const hasTotalBalance =
-    balance?.balance !== undefined && totalAmount && totalAmount <= balance.balance;
+    balance?.balance !== undefined &&
+    totalAmount &&
+    totalAmount <= balance.balance;
 
   // Reset error on form change
   useEffect(() => {
@@ -118,7 +120,7 @@ export function TransferForm({
           setStatus('authorizing');
           const authResult = await getOrSignAuthorization();
           authorization = authResult.authorization;
-          
+
           // If signing failed with an error (not just unsupported), show it
           if (authResult.error && authResult.supported) {
             throw new Error(authResult.error);
@@ -240,7 +242,7 @@ export function TransferForm({
               recipient={recipient as Address}
               sender={userAddress}
               onFeeQuoteLoaded={setFeeQuote}
-              enabled={!!amountWei && !!recipient && isValidRecipient}
+              enabled={true}
             />
           )}
 
@@ -251,7 +253,10 @@ export function TransferForm({
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Total</span>
                   <span className="font-semibold">
-                    {(Number(totalAmount) / Math.pow(10, balance.decimals ?? 6)).toFixed(6)} {tokenSymbol}
+                    {(
+                      Number(totalAmount) / Math.pow(10, balance.decimals ?? 6)
+                    ).toFixed(6)}{' '}
+                    {tokenSymbol}
                   </span>
                 </div>
                 {!hasTotalBalance && (

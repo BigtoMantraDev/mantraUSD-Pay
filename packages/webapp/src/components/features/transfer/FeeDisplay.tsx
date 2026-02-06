@@ -41,6 +41,7 @@ export function FeeDisplay({
   const {
     data: feeQuote,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,
@@ -144,11 +145,11 @@ export function FeeDisplay({
             variant="ghost"
             size="icon"
             onClick={() => refetch()}
-            disabled={isLoading}
+            disabled={isFetching}
             title="Refresh fee quote"
           >
             <RefreshCw
-              className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+              className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
             />
           </Button>
         </div>
