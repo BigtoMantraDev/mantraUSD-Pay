@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { NonceService } from './nonce.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { getAddress } from 'viem';
+import { ConfigService } from '@nestjs/config';
 
 describe('NonceService', () => {
   let service: NonceService;
