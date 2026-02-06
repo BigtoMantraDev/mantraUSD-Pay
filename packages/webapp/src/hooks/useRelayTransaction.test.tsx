@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { useRelayTransaction, type RelayRequest } from './useRelayTransaction';
 import * as useAppConfigModule from './useAppConfig';
+import { useRelayTransaction, type RelayRequest } from './useRelayTransaction';
 
 // Mock useAppConfig
 vi.mock('./useAppConfig');
@@ -32,7 +32,6 @@ describe('useRelayTransaction', () => {
   });
 
   const wrapper = ({ children }: { children: ReactNode }) => (
-    // eslint-disable-next-line prettier/prettier
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
@@ -60,7 +59,7 @@ describe('useRelayTransaction', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => mockResponse,
-    }) as any;
+    }) as unknown as typeof fetch;
 
     const { result } = renderHook(() => useRelayTransaction(), { wrapper });
 

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { useNonce } from './useNonce';
 import * as useAppConfigModule from './useAppConfig';
+import { useNonce } from './useNonce';
 
 // Mock useAppConfig
 vi.mock('./useAppConfig');
@@ -58,7 +58,9 @@ describe('useNonce', () => {
 
     expect(result.current.data).toBe(5n);
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/nonce/0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'),
+      expect.stringContaining(
+        '/nonce/0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+      ),
     );
   });
 

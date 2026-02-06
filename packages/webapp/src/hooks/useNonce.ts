@@ -16,7 +16,7 @@ export function useNonce(owner: Address | undefined) {
   const config = useAppConfig();
 
   return useQuery({
-    queryKey: ['nonce', config.chainId, owner],
+    queryKey: ['nonce', config.chainId, config.backend.url, owner],
     queryFn: async (): Promise<bigint> => {
       if (!owner) throw new Error('No owner address');
 
@@ -34,7 +34,12 @@ export function useNonce(owner: Address | undefined) {
       const data = await response.json();
       const nonce = BigInt(data.nonce);
 
-      console.log('[useNonce] Fetched nonce:', nonce.toString(), 'for owner:', owner);
+      console.log(
+        '[useNonce] Fetched nonce:',
+        nonce.toString(),
+        'for owner:',
+        owner,
+      );
       return nonce;
     },
     enabled: !!owner,

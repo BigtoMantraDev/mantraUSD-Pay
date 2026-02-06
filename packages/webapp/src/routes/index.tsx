@@ -12,7 +12,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
-// @ts-ignore - Route tree type generation issue
 export const Route = createFileRoute('/')({
   component: HomePage,
 });
@@ -36,7 +35,6 @@ function HomePage() {
         </p>
         <div className="flex justify-center gap-4">
           <Button asChild size="lg">
-            {/* @ts-ignore - Route tree type generation issue */}
             <Link to="/transfer">
               Start Transfer <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -101,7 +99,6 @@ function HomePage() {
         </CardHeader>
         <CardContent>
           <Button asChild size="lg" className="w-full md:w-auto">
-            {/* @ts-ignore - Route tree type generation issue */}
             <Link to="/transfer">Go to Transfer Page</Link>
           </Button>
         </CardContent>

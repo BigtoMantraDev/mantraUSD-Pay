@@ -1,5 +1,6 @@
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { createAppKit } from '@reown/appkit/react';
+import type { Chain } from 'viem';
 
 import {
   SUPPORTED_CHAINS,
@@ -20,7 +21,7 @@ const networks = import.meta.env.DEV
 
 // Create Wagmi adapter
 const wagmiAdapter = new WagmiAdapter({
-  networks: networks as any,
+  networks: networks as Chain[],
   projectId,
 });
 

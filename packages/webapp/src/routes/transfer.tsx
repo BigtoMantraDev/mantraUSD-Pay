@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useAccount } from 'wagmi';
 
 import { BackendStatus } from '@/components/common/BackendStatus';
 import { ConnectGuard } from '@/components/common/ConnectGuard';
@@ -12,13 +13,11 @@ import {
 } from '@/components/ui/card';
 import { useAppConfig, useTokenBalance } from '@/hooks';
 import { formatTokenBalance } from '@/lib/formatTokenBalance';
-import { useAccount } from 'wagmi';
 
 /**
  * Transfer Page - Gasless Token Transfers
  * Allows users to send tokens without paying gas fees
  */
-// @ts-ignore - Route tree type generation issue
 export const Route = createFileRoute('/transfer')({
   component: TransferPage,
 });
@@ -32,7 +31,11 @@ function TransferPage() {
   const tokenSymbol = 'mantraUSD';
 
   // Fetch user's mantraUSD balance
-  const { balance, decimals, isLoading: balanceLoading } = useTokenBalance({
+  const {
+    balance,
+    decimals,
+    isLoading: balanceLoading,
+  } = useTokenBalance({
     owner: address,
     tokenAddress,
   });

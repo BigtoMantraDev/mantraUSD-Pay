@@ -7,7 +7,7 @@ describe('useEIP712Sign', () => {
     it('should correctly parse valid signature', () => {
       // Valid signature: 0x (2) + r (64 hex chars) + s (64 hex chars) + v (2 hex chars) = 132 chars total
       // r = 32 bytes = 64 hex chars
-      // s = 32 bytes = 64 hex chars  
+      // s = 32 bytes = 64 hex chars
       // v = 1 byte = 2 hex chars (1b = 27)
       const r = 'a'.repeat(64);
       const s = 'b'.repeat(64);

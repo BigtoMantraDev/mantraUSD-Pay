@@ -49,4 +49,7 @@ export { useEIP712Sign, encodeSignature } from './useEIP712Sign';
 
 // EIP-7702 Authorization Hook
 export { useSignAuthorization } from './useSignAuthorization';
-export type { SignedAuthorization, AuthorizationResult } from './useSignAuthorization';
+export type {
+  SignedAuthorization,
+  AuthorizationResult,
+} from './useSignAuthorization';

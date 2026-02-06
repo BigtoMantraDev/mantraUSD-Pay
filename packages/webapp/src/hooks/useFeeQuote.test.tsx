@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { useFeeQuote } from './useFeeQuote';
 import * as useAppConfigModule from './useAppConfig';
+import { useFeeQuote } from './useFeeQuote';
 
 // Mock useAppConfig
 vi.mock('./useAppConfig');
@@ -32,7 +32,6 @@ describe('useFeeQuote', () => {
   });
 
   const wrapper = ({ children }: { children: ReactNode }) => (
-    // eslint-disable-next-line prettier/prettier
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 

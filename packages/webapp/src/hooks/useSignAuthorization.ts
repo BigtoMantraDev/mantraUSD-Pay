@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { useWalletClient, useAccount } from 'wagmi';
 import type { Address } from 'viem';
+import { useWalletClient, useAccount } from 'wagmi';
 
 import { useAppConfig } from './useAppConfig';
 import { useLocalStorage } from './useLocalStorage';
@@ -109,16 +109,15 @@ export function useSignAuthorization() {
   const [error, setError] = useState<Error | null>(null);
 
   // Per-session storage for authorization
-  const [storedAuth, setStoredAuth] = useLocalStorage<StoredAuthorization | null>(
-    AUTHORIZATION_STORAGE_KEY,
-    null,
-  );
+  const [storedAuth, setStoredAuth] =
+    useLocalStorage<StoredAuthorization | null>(
+      AUTHORIZATION_STORAGE_KEY,
+      null,
+    );
 
   // Cache whether wallet supports EIP-7702
-  const [walletSupport, setWalletSupport] = useLocalStorage<WalletSupportInfo | null>(
-    WALLET_SUPPORT_KEY,
-    null,
-  );
+  const [walletSupport, setWalletSupport] =
+    useLocalStorage<WalletSupportInfo | null>(WALLET_SUPPORT_KEY, null);
 
   /**
    * Check if current wallet is known to support EIP-7702
@@ -166,112 +165,135 @@ export function useSignAuthorization() {
    * Try to sign a new EIP-7702 authorization
    * Returns null if wallet doesn't support it
    */
-  const trySignAuthorization = useCallback(async (): Promise<AuthorizationResult> => {
-    if (!walletClient) {
-      return { authorization: null, supported: false, error: 'Wallet not connected' };
-    }
-
-    if (!address) {
-      return { authorization: null, supported: false, error: 'No account connected' };
-    }
-
-    // Check if we already know this wallet doesn't support EIP-7702
-    const knownSupport = getKnownSupport();
-    if (knownSupport === false) {
-      return { authorization: null, supported: false };
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Sign authorization using viem's EIP-7702 method
-      // This signs: keccak256(0x05 || rlp([chain_id, address, nonce]))
-      const signedAuth = await walletClient.signAuthorization({
-        contractAddress: config.contracts.delegatedAccount,
-      });
-
-      // Mark this wallet as supporting EIP-7702
-      setWalletSupport({
-        supported: true,
-        timestamp: Date.now(),
-        connectorId: connector?.id,
-      });
-
-      // Convert to our format - viem returns 'address' but we use 'contractAddress'
-      // Handle both yParity and v (viem may return either depending on version)
-      const yParity =
-        signedAuth.yParity !== undefined
-          ? signedAuth.yParity
-          : signedAuth.v !== undefined
-            ? Number(signedAuth.v) % 2
-            : 0;
-
-      const authorization: SignedAuthorization = {
-        chainId: signedAuth.chainId,
-        contractAddress:
-          signedAuth.address ?? (signedAuth as unknown as { contractAddress: Address }).contractAddress,
-        nonce: signedAuth.nonce.toString(),
-        r: signedAuth.r,
-        s: signedAuth.s,
-        yParity,
-      };
-
-      // Cache for session
-      setStoredAuth({
-        authorization,
-        timestamp: Date.now(),
-        signer: address,
-      });
-
-      return { authorization, supported: true };
-    } catch (err) {
-      // Check if this is an "unsupported wallet" error
-      if (isUnsupportedWalletError(err)) {
-        console.warn(
-          '[EIP-7702] Wallet does not support signAuthorization. ' +
-            'Proceeding without authorization - backend will handle delegation.',
-        );
-
-        // Cache that this wallet doesn't support EIP-7702
-        setWalletSupport({
+  const trySignAuthorization =
+    useCallback(async (): Promise<AuthorizationResult> => {
+      if (!walletClient) {
+        return {
+          authorization: null,
           supported: false,
+          error: 'Wallet not connected',
+        };
+      }
+
+      if (!address) {
+        return {
+          authorization: null,
+          supported: false,
+          error: 'No account connected',
+        };
+      }
+
+      // Check if we already know this wallet doesn't support EIP-7702
+      const knownSupport = getKnownSupport();
+      if (knownSupport === false) {
+        return { authorization: null, supported: false };
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Sign authorization using viem's EIP-7702 method
+        // This signs: keccak256(0x05 || rlp([chain_id, address, nonce]))
+        const signedAuth = await walletClient.signAuthorization({
+          contractAddress: config.contracts.delegatedAccount,
+        });
+
+        // Mark this wallet as supporting EIP-7702
+        setWalletSupport({
+          supported: true,
           timestamp: Date.now(),
           connectorId: connector?.id,
         });
 
-        return { authorization: null, supported: false };
-      }
+        // Convert to our format - viem returns 'address' but we use 'contractAddress'
+        // Handle both yParity and v (viem may return either depending on version)
+        const yParity =
+          signedAuth.yParity !== undefined
+            ? signedAuth.yParity
+            : signedAuth.v !== undefined
+              ? Number(signedAuth.v) % 2
+              : 0;
 
-      // Other error - user rejected, network issue, etc.
-      const error = err instanceof Error ? err : new Error('Failed to sign authorization');
-      setError(error);
-      return { authorization: null, supported: true, error: error.message };
-    } finally {
-      setIsLoading(false);
-    }
-  }, [walletClient, address, config.contracts.delegatedAccount, setStoredAuth, setWalletSupport, connector, getKnownSupport]);
+        const authorization: SignedAuthorization = {
+          chainId: signedAuth.chainId,
+          contractAddress:
+            signedAuth.address ??
+            (signedAuth as unknown as { contractAddress: Address })
+              .contractAddress,
+          nonce: signedAuth.nonce.toString(),
+          r: signedAuth.r,
+          s: signedAuth.s,
+          yParity,
+        };
+
+        // Cache for session
+        setStoredAuth({
+          authorization,
+          timestamp: Date.now(),
+          signer: address,
+        });
+
+        return { authorization, supported: true };
+      } catch (err) {
+        // Check if this is an "unsupported wallet" error
+        if (isUnsupportedWalletError(err)) {
+          console.warn(
+            '[EIP-7702] Wallet does not support signAuthorization. ' +
+              'Proceeding without authorization - backend will handle delegation.',
+          );
+
+          // Cache that this wallet doesn't support EIP-7702
+          setWalletSupport({
+            supported: false,
+            timestamp: Date.now(),
+            connectorId: connector?.id,
+          });
+
+          return { authorization: null, supported: false };
+        }
+
+        // Other error - user rejected, network issue, etc.
+        const error =
+          err instanceof Error
+            ? err
+            : new Error('Failed to sign authorization');
+        setError(error);
+        return { authorization: null, supported: true, error: error.message };
+      } finally {
+        setIsLoading(false);
+      }
+    }, [
+      walletClient,
+      address,
+      config.contracts.delegatedAccount,
+      setStoredAuth,
+      setWalletSupport,
+      connector,
+      getKnownSupport,
+    ]);
 
   /**
    * Get authorization - returns cached if available, otherwise tries to sign
    * Handles unsupported wallets gracefully
    */
-  const getOrSignAuthorization = useCallback(async (): Promise<AuthorizationResult> => {
-    // Check cache first
-    const cached = getCachedAuthorization();
-    if (cached) {
-      return { authorization: cached, supported: true };
-    }
+  const getOrSignAuthorization =
+    useCallback(async (): Promise<AuthorizationResult> => {
+      // Check cache first
+      const cached = getCachedAuthorization();
+      if (cached) {
+        return { authorization: cached, supported: true };
+      }
 
-    // Check if we know this wallet doesn't support EIP-7702
-    const knownSupport = getKnownSupport();
-    if (knownSupport === false) {
-      return { authorization: null, supported: false };
-    }
+      // Check if we know this wallet doesn't support EIP-7702
+      const knownSupport = getKnownSupport();
+      if (knownSupport === false) {
+        return { authorization: null, supported: false };
+      }
 
-    // Try to sign a new authorization
-    return trySignAuthorization();
-  }, [getCachedAuthorization, getKnownSupport, trySignAuthorization]);
+      // Try to sign a new authorization
+      return trySignAuthorization();
+    }, [getCachedAuthorization, getKnownSupport, trySignAuthorization]);
 
   /**
    * Clear cached authorization (e.g., on disconnect or error)
@@ -296,7 +318,8 @@ export function useSignAuthorization() {
   /**
    * Check if authorization is needed (no valid cache and wallet might support it)
    */
-  const needsAuthorization = getCachedAuthorization() === null && isSupported !== false;
+  const needsAuthorization =
+    getCachedAuthorization() === null && isSupported !== false;
 
   return {
     /** Try to sign or get cached authorization - handles unsupported wallets */
