@@ -42,9 +42,7 @@ export class FeeService {
     const feeTokenAddress = this.configService.get<string>(
       'contracts.token.address',
     )!;
-    const relayerPrivateKey = this.configService.get<string>(
-      'relayer.privateKey',
-    )!;
+    this.configService.get<string>('relayer.privateKey')!;
 
     // Estimate actual gas for this specific transfer
     const estimatedGas = await this.gasOracleService.estimateExecuteGas({

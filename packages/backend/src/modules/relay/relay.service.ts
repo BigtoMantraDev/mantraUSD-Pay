@@ -1,8 +1,8 @@
 import {
-  Injectable,
-  Logger,
   BadRequestException,
+  Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BlockchainService } from '../blockchain/blockchain.service';
@@ -11,15 +11,15 @@ import { GasOracleService } from '../blockchain/gas-oracle.service';
 import { RelayRequestDto } from './dto/relay-request.dto';
 import { RelayResponseDto, RelayStatusDto } from './dto/relay-response.dto';
 import {
-  keccak256,
-  recoverAddress,
-  encodeAbiParameters,
-  parseAbiParameters,
-  formatEther,
-  encodeFunctionData,
-  toBytes,
   concat,
+  encodeAbiParameters,
+  encodeFunctionData,
+  formatEther,
+  keccak256,
+  parseAbiParameters,
+  recoverAddress,
   type SignedAuthorization,
+  toBytes,
 } from 'viem';
 
 @Injectable()
@@ -188,9 +188,7 @@ export class RelayService {
 
     // Compute final EIP-712 digest using raw concatenation (NOT ABI encoding!)
     // The format is: keccak256("\x19\x01" || domainSeparator || structHash)
-    const digest = keccak256(concat(['0x1901', domainSeparator, intentHash]));
-
-    return digest;
+    return keccak256(concat(['0x1901', domainSeparator, intentHash]));
   }
 
   private async broadcastTransaction(
@@ -199,9 +197,6 @@ export class RelayService {
     const publicClient = this.blockchainService.getPublicClient();
     const walletClient = this.blockchainService.getWalletClient();
     const relayerAccount = this.relayerWalletService.getAccount();
-    const delegatedAccountAddress = this.configService.get<`0x${string}`>(
-      'contracts.delegatedAccount',
-    )!;
 
     // EIP-7702 execute ABI - simplified since address(this) is the user's EOA with delegation
     const executeAbi = [
