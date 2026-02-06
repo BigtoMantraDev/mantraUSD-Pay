@@ -242,7 +242,6 @@ export function TransferForm({
               recipient={recipient as Address}
               sender={userAddress}
               onFeeQuoteLoaded={setFeeQuote}
-              enabled={true}
             />
           )}
 
