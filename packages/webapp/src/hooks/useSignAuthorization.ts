@@ -58,6 +58,8 @@ interface WalletSupportInfo {
   timestamp: number;
   /** Wallet/connector identifier */
   connectorId?: string;
+  /** Contract address used when checking support */
+  contractAddress?: string;
 }
 
 const AUTHORIZATION_STORAGE_KEY = 'eip7702-authorization';
@@ -129,12 +131,20 @@ export function useSignAuthorization() {
     // Check if this is for the same connector
     if (walletSupport.connectorId !== connector.id) return undefined;
 
+    // Check if contract address matches (invalidate if contract changed)
+    if (
+      walletSupport.contractAddress?.toLowerCase() !==
+      config.contracts.delegatedAccount.toLowerCase()
+    ) {
+      return undefined;
+    }
+
     // Check TTL
     const now = Date.now();
     if (now - walletSupport.timestamp > SUPPORT_CHECK_TTL_MS) return undefined;
 
     return walletSupport.supported;
-  }, [walletSupport, connector]);
+  }, [walletSupport, connector, config.contracts.delegatedAccount]);
 
   /**
    * Check if we have a valid cached authorization for the current user
@@ -152,6 +162,15 @@ export function useSignAuthorization() {
       return null;
     }
 
+    // Validate contract address matches current config
+    // This ensures we get a new authorization if the contract is redeployed
+    if (
+      storedAuth.authorization.contractAddress.toLowerCase() !==
+      config.contracts.delegatedAccount.toLowerCase()
+    ) {
+      return null;
+    }
+
     // Validate TTL
     const now = Date.now();
     if (now - storedAuth.timestamp > AUTHORIZATION_TTL_MS) {
@@ -159,7 +178,7 @@ export function useSignAuthorization() {
     }
 
     return storedAuth.authorization;
-  }, [storedAuth, address, config.chainId]);
+  }, [storedAuth, address, config.chainId, config.contracts.delegatedAccount]);
 
   /**
    * Try to sign a new EIP-7702 authorization
@@ -204,6 +223,7 @@ export function useSignAuthorization() {
           supported: true,
           timestamp: Date.now(),
           connectorId: connector?.id,
+          contractAddress: config.contracts.delegatedAccount,
         });
 
         // Convert to our format - viem returns 'address' but we use 'contractAddress'
@@ -240,7 +260,7 @@ export function useSignAuthorization() {
         if (isUnsupportedWalletError(err)) {
           console.warn(
             '[EIP-7702] Wallet does not support signAuthorization. ' +
-              'Proceeding without authorization - backend will handle delegation.',
+              'Transaction will fail unless EIP-7702 authorization is provided.',
           );
 
           // Cache that this wallet doesn't support EIP-7702
@@ -248,6 +268,7 @@ export function useSignAuthorization() {
             supported: false,
             timestamp: Date.now(),
             connectorId: connector?.id,
+            contractAddress: config.contracts.delegatedAccount,
           });
 
           return { authorization: null, supported: false };

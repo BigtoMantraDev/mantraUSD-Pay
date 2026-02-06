@@ -35,6 +35,14 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
     bytes32 public constant INTENT_TYPEHASH =
         keccak256("Intent(address destination,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
 
+    /// @notice EIP-712 typehash for BatchedIntent
+    bytes32 public constant BATCHED_INTENT_TYPEHASH =
+        keccak256("BatchedIntent(Call[] calls,uint256 nonce,uint256 deadline)Call(address destination,uint256 value,bytes data)");
+
+    /// @notice EIP-712 typehash for Call (used in BatchedIntent)
+    bytes32 public constant CALL_TYPEHASH =
+        keccak256("Call(address destination,uint256 value,bytes data)");
+
     /// @notice EIP-1271 magic value indicating a valid signature
     bytes4 private constant EIP1271_MAGIC_VALUE = 0x1626ba7e;
 
@@ -64,6 +72,7 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
     error InvalidDestination();
     error InvalidToken();
     error ExecutionFailed(bytes reason);
+    error EmptyBatch();
 
     // ============ Constructor ============
 
@@ -164,6 +173,77 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
 
     /**
      * @inheritdoc IDelegatedAccount
+     * @dev Executes multiple calls atomically. All calls must succeed or the entire batch reverts.
+     *      This is used for transfers with fees - the batch contains both the user transfer and fee transfer.
+     */
+    function executeBatch(
+        Call[] calldata calls,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    )
+        external
+        nonReentrant
+        returns (bytes[] memory results)
+    {
+        // With EIP-7702, address(this) is the user's EOA
+        address account = address(this);
+
+        // Validate batch is not empty
+        if (calls.length == 0) revert EmptyBatch();
+
+        // Validate deadline
+        if (block.timestamp > deadline) revert SignatureExpired();
+
+        // Validate nonce for the delegating account
+        if (nonce != _nonces[account]) revert InvalidNonce();
+
+        // Validate all destinations before execution
+        for (uint256 i = 0; i < calls.length; i++) {
+            if (calls[i].destination == address(0) || calls[i].destination == account) {
+                revert InvalidDestination();
+            }
+        }
+
+        // Compute EIP-712 digest for BatchedIntent
+        bytes32 structHash = _computeBatchedIntentHash(calls, nonce, deadline);
+        bytes32 domainSep = domainSeparator();
+        bytes32 digest;
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Compute digest = keccak256("\x19\x01" || domainSeparator || structHash)
+            let m := mload(0x40)
+            mstore(m, 0x1901000000000000000000000000000000000000000000000000000000000000)
+            mstore(add(m, 0x02), domainSep)
+            mstore(add(m, 0x22), structHash)
+            digest := keccak256(m, 0x42)
+        }
+
+        // Verify signature
+        if (!_isValidSignature(account, digest, signature)) {
+            revert InvalidSignature();
+        }
+
+        // Execute all calls atomically
+        results = new bytes[](calls.length);
+        for (uint256 i = 0; i < calls.length; i++) {
+            (bool success, bytes memory returnData) = calls[i].destination.call{ value: calls[i].value }(calls[i].data);
+            if (!success) {
+                revert ExecutionFailed(returnData);
+            }
+            results[i] = returnData;
+        }
+
+        // Increment nonce only after all calls succeed
+        _nonces[account] = nonce + 1;
+
+        emit BatchExecuted(account, calls.length, nonce, true);
+
+        return results;
+    }
+
+    /**
+     * @inheritdoc IDelegatedAccount
      * @notice SECURITY WARNING: This function transfers tokens from msg.sender to the recipient.
      *         Only approve this contract for the exact amount needed for immediate transfer.
      *         For better security with gasless transactions, use execute() with signature verification.
@@ -211,6 +291,43 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
     }
 
     // ============ Internal Functions ============
+
+    /**
+     * @notice Compute the EIP-712 struct hash for a BatchedIntent
+     * @param calls The array of calls in the batch
+     * @param nonce The nonce for replay protection
+     * @param deadline The deadline for signature expiry
+     * @return The struct hash
+     */
+    function _computeBatchedIntentHash(
+        Call[] calldata calls,
+        uint256 nonce,
+        uint256 deadline
+    ) private pure returns (bytes32) {
+        // Compute hash of calls array
+        bytes32[] memory callHashes = new bytes32[](calls.length);
+        for (uint256 i = 0; i < calls.length; i++) {
+            callHashes[i] = keccak256(
+                abi.encode(
+                    CALL_TYPEHASH,
+                    calls[i].destination,
+                    calls[i].value,
+                    keccak256(calls[i].data)
+                )
+            );
+        }
+        bytes32 callsHash = keccak256(abi.encodePacked(callHashes));
+
+        // Compute BatchedIntent struct hash
+        return keccak256(
+            abi.encode(
+                BATCHED_INTENT_TYPEHASH,
+                callsHash,
+                nonce,
+                deadline
+            )
+        );
+    }
 
     /**
      * @notice Compute the EIP-712 domain separator

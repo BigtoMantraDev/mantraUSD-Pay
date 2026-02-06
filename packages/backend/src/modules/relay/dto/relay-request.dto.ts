@@ -78,6 +78,34 @@ class IntentDto {
   deadline: string;
 }
 
+/**
+ * Fee information for relay transactions with fee collection
+ */
+class FeeInfoDto {
+  @ApiProperty({
+    example: '0x4B545d0758eda6601B051259bD977125fbdA7ba2',
+    description: 'Token address for fee payment (mantraUSD)',
+  })
+  @IsEthereumAddress()
+  feeToken: string;
+
+  @ApiProperty({
+    example: '50000',
+    description: 'Fee amount in token wei',
+  })
+  @IsString()
+  @Matches(/^[0-9]+$/)
+  feeAmount: string;
+
+  @ApiProperty({
+    example: '0x1234...abcd',
+    description: 'Backend signature authorizing this fee quote',
+  })
+  @IsString()
+  @Matches(/^0x[0-9a-fA-F]*$/)
+  feeSignature: string;
+}
+
 export class RelayRequestDto {
   @ApiProperty({ example: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb' })
   @IsEthereumAddress()
@@ -106,6 +134,16 @@ export class RelayRequestDto {
   @ValidateNested()
   @Type(() => IntentDto)
   intent: IntentDto;
+
+  @ApiPropertyOptional({
+    type: FeeInfoDto,
+    description:
+      'Fee information for the relay transaction. If provided, the relayer will execute a batch transaction to collect fees.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FeeInfoDto)
+  fee?: FeeInfoDto;
 
   @IsNumber()
   chainId: number;

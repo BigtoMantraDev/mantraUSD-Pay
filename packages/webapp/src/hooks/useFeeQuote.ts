@@ -15,6 +15,8 @@ export interface FeeQuote {
   deadline: number;
   /** Backend signature for fee approval */
   signature: `0x${string}`;
+  /** Relayer address for fee collection */
+  relayerAddress: Address;
 }
 
 /**

@@ -28,4 +28,10 @@ export class FeeQuoteDto {
     description: 'Backend signature authorizing this fee quote',
   })
   signature: string;
+
+  @ApiProperty({
+    example: '0x78d891B412eaAAf000D28Bb3EE44c849f6F12345',
+    description: 'Relayer address for fee collection',
+  })
+  relayerAddress: string;
 }

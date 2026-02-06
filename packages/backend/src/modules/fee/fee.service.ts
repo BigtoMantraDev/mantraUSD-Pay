@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { keccak256, parseUnits, toHex } from 'viem';
 import { GasOracleService } from '../blockchain/gas-oracle.service';
+import { RelayerWalletService } from '../blockchain/relayer-wallet.service';
 import { FeeQuoteDto } from './dto/fee-quote.dto';
 import { FeeQuoteRequestDto } from './dto/fee-quote-request.dto';
 
@@ -16,6 +17,7 @@ export class FeeService {
   constructor(
     private configService: ConfigService,
     private gasOracleService: GasOracleService,
+    private relayerWalletService: RelayerWalletService,
   ) {}
 
   async getFeeQuote(params: FeeQuoteRequestDto): Promise<FeeQuoteDto> {
@@ -85,11 +87,15 @@ export class FeeService {
       `Fee quote: ${feeWei.toString()} wei (gas: ${estimatedGas}, price: ${gasPrice})`,
     );
 
+    // Get relayer address for fee collection
+    const relayerAddress = this.relayerWalletService.getAddress();
+
     const quote: FeeQuoteDto = {
       feeAmount: feeWei.toString(),
       feeToken: feeTokenAddress,
       deadline,
       signature,
+      relayerAddress,
     };
 
     // Cache for 3 seconds
@@ -111,5 +117,41 @@ export class FeeService {
         this.quoteCache.delete(key);
       }
     }
+  }
+
+  /**
+   * Verify a fee quote signature
+   * @param feeAmount The fee amount in wei
+   * @param feeToken The fee token address
+   * @param deadline The deadline timestamp
+   * @param signature The signature to verify
+   * @returns true if the signature is valid and deadline hasn't expired
+   */
+  verifyFeeQuote(
+    feeAmount: string,
+    feeToken: string,
+    deadline: number,
+    signature: string,
+  ): boolean {
+    // Check deadline hasn't expired
+    const now = Math.floor(Date.now() / 1000);
+    if (deadline <= now) {
+      this.logger.warn(`Fee quote expired: deadline ${deadline} < now ${now}`);
+      return false;
+    }
+
+    // Recompute the expected signature hash
+    const expectedMessageHash = keccak256(
+      toHex(`${feeAmount}-${feeToken}-${deadline}`),
+    );
+    const expectedSignature = `0x${expectedMessageHash.slice(2)}${'00'.repeat(32)}`;
+
+    // Compare signatures
+    if (signature !== expectedSignature) {
+      this.logger.warn('Fee quote signature mismatch');
+      return false;
+    }
+
+    return true;
   }
 }
