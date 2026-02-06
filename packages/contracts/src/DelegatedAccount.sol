@@ -12,11 +12,15 @@ import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * @title DelegatedAccount
  * @notice EIP-7702 execution contract enabling gasless transactions for EOA wallets
  * @dev This contract allows EOA wallets to delegate transaction execution through EIP-7702.
- *      Customers sign off-chain using EIP-712 typed data, and a relay service broadcasts
- *      the transaction with the delegation.
+ *      With EIP-7702, when this contract is designated as the implementation for an EOA,
+ *      address(this) IS the user's EOA address. This enables true gasless execution:
+ *      - User signs an EIP-7702 authorization to delegate their EOA to this contract
+ *      - User signs an EIP-712 intent specifying what action to execute
+ *      - Relayer broadcasts a Type 4 transaction with the authorization list
+ *      - The contract code runs in the user's EOA context, msg.sender is the relayer
  *
  * Security Features:
- * - Per-account nonce tracking for replay protection
+ * - Per-account nonce tracking for replay protection (using address(this))
  * - Deadline enforcement for signature expiry
  * - Destination validation (no zero address or self-calls)
  * - Support for both EOA and smart contract wallet signatures (EIP-1271)
@@ -27,20 +31,25 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
 
     // ============ Constants ============
 
-    /// @notice EIP-712 typehash for execute data
-    bytes32 public constant EXECUTE_TYPEHASH =
-        keccak256("ExecuteData(address account,address destination,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
+    /// @notice EIP-712 typehash for Intent (matches frontend INTENT_TYPES)
+    bytes32 public constant INTENT_TYPEHASH =
+        keccak256("Intent(address destination,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
 
     /// @notice EIP-1271 magic value indicating a valid signature
     bytes4 private constant EIP1271_MAGIC_VALUE = 0x1626ba7e;
 
     // ============ Immutables ============
 
-    /// @notice EIP-712 domain separator (computed at deployment)
-    bytes32 private immutable _DOMAIN_SEPARATOR;
+    /// @notice The implementation contract address (used for EIP-712 domain)
+    /// @dev With EIP-7702, address(this) varies per delegation, but the domain
+    ///      should use a consistent verifyingContract for signature verification.
+    address private immutable _implementation;
+
+    /// @notice Cached domain separator (uses implementation address)
+    bytes32 private immutable _cachedDomainSeparator;
 
     /// @notice Chain ID at deployment (for domain separator validation)
-    uint256 private immutable _CHAIN_ID;
+    uint256 private immutable _cachedChainId;
 
     // ============ State ============
 
@@ -59,17 +68,20 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
     // ============ Constructor ============
 
     constructor() {
-        _CHAIN_ID = block.chainid;
-        _DOMAIN_SEPARATOR = _computeDomainSeparator();
+        // Store implementation address for consistent EIP-712 domain
+        _implementation = address(this);
+        _cachedChainId = block.chainid;
+        _cachedDomainSeparator = _computeDomainSeparator(_implementation);
     }
 
     // ============ External Functions ============
 
     /**
      * @inheritdoc IDelegatedAccount
+     * @dev With EIP-7702, address(this) is the user's EOA. The signature must be from
+     *      address(this) to prove the user authorized this specific action.
      */
     function execute(
-        address account,
         address destination,
         uint256 value,
         bytes calldata data,
@@ -81,18 +93,21 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
         nonReentrant
         returns (bytes memory)
     {
+        // With EIP-7702, address(this) is the user's EOA
+        address account = address(this);
+
         // Validate deadline
         if (block.timestamp > deadline) revert SignatureExpired();
 
         // Validate destination
-        if (destination == address(0) || destination == address(this)) {
+        if (destination == address(0) || destination == account) {
             revert InvalidDestination();
         }
 
-        // Validate nonce for the signing account
+        // Validate nonce for the delegating account
         if (nonce != _nonces[account]) revert InvalidNonce();
 
-        // Verify signature - the signature must be from the account parameter
+        // Verify signature - the signature must be from address(this) (the user's EOA)
         bytes32 dataHash;
         /// @solidity memory-safe-assembly
         assembly {
@@ -100,21 +115,19 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
             calldatacopy(m, data.offset, data.length)
             dataHash := keccak256(m, data.length)
         }
-        bytes32 typeHash = EXECUTE_TYPEHASH;
+        bytes32 typeHash = INTENT_TYPEHASH;
         bytes32 structHash;
         /// @solidity memory-safe-assembly
         assembly {
-            // Compute structHash = keccak256(abi.encode(EXECUTE_TYPEHASH, account, destination, value, dataHash, nonce,
-            // deadline))
+            // Compute structHash = keccak256(abi.encode(INTENT_TYPEHASH, destination, value, dataHash, nonce, deadline))
             let m := mload(0x40)
             mstore(m, typeHash)
-            mstore(add(m, 0x20), account)
-            mstore(add(m, 0x40), destination)
-            mstore(add(m, 0x60), value)
-            mstore(add(m, 0x80), dataHash)
-            mstore(add(m, 0xa0), nonce)
-            mstore(add(m, 0xc0), deadline)
-            structHash := keccak256(m, 0xe0)
+            mstore(add(m, 0x20), destination)
+            mstore(add(m, 0x40), value)
+            mstore(add(m, 0x60), dataHash)
+            mstore(add(m, 0x80), nonce)
+            mstore(add(m, 0xa0), deadline)
+            structHash := keccak256(m, 0xc0)
         }
 
         bytes32 domainSep = domainSeparator();
@@ -133,8 +146,8 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
             revert InvalidSignature();
         }
 
-        // Execute call then update state
-        // The nonce is incremented after execution to ensure failed calls don't consume nonces
+        // Execute call from the user's EOA context
+        // With EIP-7702, this call originates from address(this) which is the user's EOA
         (bool success, bytes memory returnData) = destination.call{ value: value }(data);
 
         if (!success) {
@@ -177,23 +190,34 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
 
     /**
      * @inheritdoc IDelegatedAccount
+     * @dev Uses the implementation contract address for consistent signature verification.
+     *      With EIP-7702, address(this) varies per delegation, but signatures should
+     *      reference a stable verifyingContract.
      */
     function domainSeparator() public view returns (bytes32) {
-        // If chain ID hasn't changed, use cached separator
-        if (block.chainid == _CHAIN_ID) {
-            return _DOMAIN_SEPARATOR;
+        // Use cached if chain ID matches, otherwise recompute
+        if (block.chainid == _cachedChainId) {
+            return _cachedDomainSeparator;
         }
-        // Otherwise recompute (handles chain forks)
-        return _computeDomainSeparator();
+        return _computeDomainSeparator(_implementation);
+    }
+
+    /**
+     * @notice Get the implementation contract address used for EIP-712 domain
+     * @return The implementation address
+     */
+    function implementation() external view returns (address) {
+        return _implementation;
     }
 
     // ============ Internal Functions ============
 
     /**
      * @notice Compute the EIP-712 domain separator
+     * @param verifyingContract The contract address to use in the domain
      * @return result The domain separator hash
      */
-    function _computeDomainSeparator() private view returns (bytes32 result) {
+    function _computeDomainSeparator(address verifyingContract) private view returns (bytes32 result) {
         // EIP712Domain typehash: keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
         bytes32 typeHash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
         // keccak256("DelegatedAccount")
@@ -208,7 +232,7 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
             mstore(add(m, 0x20), nameHash)
             mstore(add(m, 0x40), versionHash)
             mstore(add(m, 0x60), chainid())
-            mstore(add(m, 0x80), address())
+            mstore(add(m, 0x80), verifyingContract)
             result := keccak256(m, 0xa0)
         }
     }

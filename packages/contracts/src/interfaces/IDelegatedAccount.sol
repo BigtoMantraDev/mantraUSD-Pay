@@ -4,12 +4,15 @@ pragma solidity ^0.8.20;
 /**
  * @title IDelegatedAccount
  * @notice Interface for the EIP-7702 execution contract enabling gasless transactions
- * @dev This contract allows EOA wallets to delegate transaction execution through EIP-7702
+ * @dev This contract allows EOA wallets to delegate transaction execution through EIP-7702.
+ *      With EIP-7702, the contract code runs in the context of the user's EOA, so address(this)
+ *      IS the user's address. This enables true gasless execution where the relayer pays gas
+ *      while the user's EOA executes the action.
  */
 interface IDelegatedAccount {
     /**
      * @notice Emitted when a call is successfully executed
-     * @param account The account that authorized the execution
+     * @param account The account that authorized the execution (address(this) with EIP-7702)
      * @param destination The target contract address
      * @param value The ETH value sent with the call
      * @param nonce The nonce used for this execution
@@ -27,8 +30,9 @@ interface IDelegatedAccount {
     event TokenTransferred(address indexed token, address indexed from, address indexed to, uint256 amount);
 
     /**
-     * @notice Execute a call on behalf of the delegating account
-     * @param account The account that signed the authorization (owns the funds)
+     * @notice Execute a call using EIP-7702 delegation
+     * @dev With EIP-7702, address(this) is the user's EOA that delegated to this contract.
+     *      The signature must be from address(this) to prove authorization.
      * @param destination The target contract to call
      * @param value The ETH value to send with the call
      * @param data The calldata to send to the target
@@ -38,7 +42,6 @@ interface IDelegatedAccount {
      * @return The return data from the executed call
      */
     function execute(
-        address account,
         address destination,
         uint256 value,
         bytes calldata data,
