@@ -22,7 +22,7 @@ import { HealthModule } from './modules/health/health.module';
       useFactory: (config: ConfigService) => [
         {
           ttl: config.get<number>('rateLimit.ttl')! * 1000, // Convert to ms
-          limit: config.get<number>('rateLimit.limit')!,
+          limit: config.get<number>('rateLimit.limit', 888)!,
         },
       ],
     }),
