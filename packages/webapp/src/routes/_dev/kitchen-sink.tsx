@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import { createRoute } from '@tanstack/react-router';
 import {
   AlertCircle,
