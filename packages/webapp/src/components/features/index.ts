@@ -3,3 +3,6 @@
 
 export { FaucetCard } from './FaucetCard';
 export type { FaucetCardProps } from './FaucetCard';
+
+// Transfer feature
+export { FeeDisplay, RelayStatus, TransferForm } from './transfer';

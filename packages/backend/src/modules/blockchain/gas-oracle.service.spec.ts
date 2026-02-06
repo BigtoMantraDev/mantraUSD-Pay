@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { GasOracleService } from './gas-oracle.service';
 import { BlockchainService } from './blockchain.service';
 import { parseGwei } from 'viem';
@@ -16,6 +17,10 @@ describe('GasOracleService', () => {
     getPublicClient: jest.fn().mockReturnValue(mockPublicClient),
   };
 
+  const mockConfigService = {
+    get: jest.fn().mockReturnValue(150000),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -23,6 +28,10 @@ describe('GasOracleService', () => {
         {
           provide: BlockchainService,
           useValue: mockBlockchainService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
         },
       ],
     }).compile();

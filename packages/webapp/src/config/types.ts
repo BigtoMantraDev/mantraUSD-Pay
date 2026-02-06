@@ -27,6 +27,13 @@ export type ChainConfig = {
     omToken: Address;
     stakingPool: Address;
     migrationHelper: Address;
+    delegatedAccount: Address;
+    mantraUSD: Address;
+  };
+  /** Backend API configuration */
+  backend: {
+    /** Backend relayer URL */
+    url: string;
   };
   /** UI display properties */
   ui: {

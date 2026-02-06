@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import { createRoute } from '@tanstack/react-router';
 import {
   AlertCircle,
@@ -1177,7 +1179,7 @@ function Section({
     <section className="space-y-6">
       <div className="space-y-1 border-b border-white/20 pb-4">
         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          <div className="h-6 w-1 bg-[#F5B842] rounded-full"></div>
+          <div className="h-6 w-1 bg-[#F5B842] rounded-full" />
           {title}
         </h2>
         <p className="text-white/70">{description}</p>

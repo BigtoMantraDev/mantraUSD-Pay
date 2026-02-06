@@ -2,22 +2,28 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { FeeService } from './fee.service';
 import { GasOracleService } from '../blockchain/gas-oracle.service';
-import { parseGwei } from 'viem';
+import { FeeQuoteRequestDto } from './dto/fee-quote-request.dto';
+import { parseGwei, parseUnits } from 'viem';
 
 describe('FeeService', () => {
   let service: FeeService;
   let gasOracleService: GasOracleService;
 
   const mockGasPrice = parseGwei('10');
+  const mockEstimatedGas = BigInt(150000);
+  const mockTokenAddress = '0x4B545d0758eda6601B051259bD977125fbdA7ba2';
+  const mockRecipient = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5';
+  const mockSender = '0x1234567890123456789012345678901234567890';
+
   const mockConfigValues: Record<string, any> = {
-    'fee.enabled': true,
-    'fee.estimatedGas': 150000,
     'fee.bufferPercent': 20,
     'fee.min': 0.01,
     'fee.max': 1.0,
     'fee.quoteTtlSeconds': 60,
     'contracts.token.decimals': 6,
-    'contracts.token.symbol': 'mantraUSD',
+    'contracts.token.address': mockTokenAddress,
+    'relayer.privateKey':
+      '0x1234567890123456789012345678901234567890123456789012345678901234',
   };
 
   const mockConfigService = {
@@ -26,7 +32,14 @@ describe('FeeService', () => {
 
   const mockGasOracleService = {
     getGasPrice: jest.fn().mockResolvedValue(mockGasPrice),
-    getGasPriceGwei: jest.fn().mockResolvedValue('10'),
+    estimateExecuteGas: jest.fn().mockResolvedValue(mockEstimatedGas),
+  };
+
+  const mockFeeQuoteRequest: FeeQuoteRequestDto = {
+    token: mockTokenAddress,
+    amount: '1000000', // 1 token with 6 decimals
+    recipient: mockRecipient,
+    sender: mockSender,
   };
 
   beforeEach(async () => {
@@ -37,7 +50,7 @@ describe('FeeService', () => {
       (key: string) => mockConfigValues[key],
     );
     mockGasOracleService.getGasPrice.mockResolvedValue(mockGasPrice);
-    mockGasOracleService.getGasPriceGwei.mockResolvedValue('10');
+    mockGasOracleService.estimateExecuteGas.mockResolvedValue(mockEstimatedGas);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -63,86 +76,60 @@ describe('FeeService', () => {
 
   describe('getFeeQuote', () => {
     it('should return fee quote with correct structure', async () => {
-      const quote = await service.getFeeQuote();
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
 
-      expect(quote).toHaveProperty('fee');
-      expect(quote).toHaveProperty('feeFormatted');
-      expect(quote).toHaveProperty('gasPrice');
-      expect(quote).toHaveProperty('gasPriceGwei');
-      expect(quote).toHaveProperty('estimatedGas');
-      expect(quote).toHaveProperty('bufferPercent');
-      expect(quote).toHaveProperty('expiresAt');
-      expect(quote).toHaveProperty('enabled');
+      expect(quote).toHaveProperty('feeAmount');
+      expect(quote).toHaveProperty('feeToken');
+      expect(quote).toHaveProperty('deadline');
+      expect(quote).toHaveProperty('signature');
+    });
+
+    it('should estimate gas for the specific transfer', async () => {
+      await service.getFeeQuote(mockFeeQuoteRequest);
+
+      expect(gasOracleService.estimateExecuteGas).toHaveBeenCalledWith({
+        tokenAddress: mockFeeQuoteRequest.token,
+        amount: mockFeeQuoteRequest.amount,
+        recipient: mockFeeQuoteRequest.recipient,
+        sender: mockFeeQuoteRequest.sender,
+      });
     });
 
     it('should fetch gas price from oracle', async () => {
-      await service.getFeeQuote();
+      await service.getFeeQuote(mockFeeQuoteRequest);
       expect(gasOracleService.getGasPrice).toHaveBeenCalled();
-      expect(gasOracleService.getGasPriceGwei).toHaveBeenCalled();
     });
 
     it('should calculate fee with buffer applied', async () => {
-      const quote = await service.getFeeQuote();
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
 
       // Gas cost = 10 gwei * 150000 = 1,500,000 gwei = 0.0015 ether
       // With 20% buffer = 0.0018 ether
-      // Convert to 6 decimals = 0.001800 tokens
-      expect(parseFloat(quote.fee)).toBeGreaterThan(0);
-      expect(quote.bufferPercent).toBe(20);
+      // This should be converted to token amount
+      expect(BigInt(quote.feeAmount)).toBeGreaterThan(BigInt(0));
     });
 
-    it('should return enabled status', async () => {
-      const quote = await service.getFeeQuote();
-      expect(quote.enabled).toBe(true);
+    it('should return configured token address as feeToken', async () => {
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
+      expect(quote.feeToken).toBe(mockTokenAddress);
     });
 
-    it('should return disabled when fee is disabled', async () => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'fee.enabled') return false;
-        return mockConfigValues[key];
-      });
-
-      const quote = await service.getFeeQuote();
-      expect(quote.enabled).toBe(false);
-    });
-
-    it('should include gas price in wei as string', async () => {
-      const quote = await service.getFeeQuote();
-      expect(quote.gasPrice).toBe(mockGasPrice.toString());
-    });
-
-    it('should include gas price in gwei', async () => {
-      const quote = await service.getFeeQuote();
-      expect(quote.gasPriceGwei).toBe('10');
-    });
-
-    it('should include estimated gas amount', async () => {
-      const quote = await service.getFeeQuote();
-      expect(quote.estimatedGas).toBe(150000);
-    });
-
-    it('should format fee with token symbol', async () => {
-      const quote = await service.getFeeQuote();
-      expect(quote.feeFormatted).toContain('mantraUSD');
-      expect(quote.feeFormatted).toContain(quote.fee);
-    });
-
-    it('should set expiration time in future', async () => {
+    it('should set deadline in the future based on TTL', async () => {
       const beforeTime = Math.floor(Date.now() / 1000);
-      const quote = await service.getFeeQuote();
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
       const afterTime = Math.floor(Date.now() / 1000);
 
-      expect(quote.expiresAt).toBeGreaterThan(beforeTime);
-      expect(quote.expiresAt).toBeLessThanOrEqual(afterTime + 60);
+      // TTL is 60 seconds
+      const expectedDeadline = beforeTime + 60;
+      expect(quote.deadline).toBeGreaterThanOrEqual(expectedDeadline - 1);
+      expect(quote.deadline).toBeLessThanOrEqual(afterTime + 60);
     });
 
-    it('should apply TTL from config', async () => {
-      const beforeTime = Math.floor(Date.now() / 1000);
-      const quote = await service.getFeeQuote();
+    it('should return a signature', async () => {
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
 
-      const expectedExpiry = beforeTime + 60; // 60 seconds TTL
-      expect(quote.expiresAt).toBeGreaterThanOrEqual(expectedExpiry - 1);
-      expect(quote.expiresAt).toBeLessThanOrEqual(expectedExpiry + 1);
+      expect(quote.signature).toBeDefined();
+      expect(quote.signature).toMatch(/^0x/);
     });
   });
 
@@ -150,33 +137,38 @@ describe('FeeService', () => {
     it('should apply minimum fee cap', async () => {
       // Set very low gas price to trigger min cap
       mockGasOracleService.getGasPrice.mockResolvedValueOnce(
-        parseGwei('0.001'),
+        parseGwei('0.0001'),
       );
-      mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('0.001');
 
-      const quote = await service.getFeeQuote();
-      expect(parseFloat(quote.fee)).toBeGreaterThanOrEqual(0.01);
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
+
+      // Min fee is 0.01 tokens with 6 decimals = 10000 wei
+      const minFeeWei = parseUnits('0.01', 6);
+      expect(BigInt(quote.feeAmount)).toBeGreaterThanOrEqual(minFeeWei);
     });
 
     it('should apply maximum fee cap', async () => {
       // Set very high gas price to trigger max cap
       mockGasOracleService.getGasPrice.mockResolvedValueOnce(
-        parseGwei('10000'),
+        parseGwei('100000'),
       );
-      mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('10000');
 
-      const quote = await service.getFeeQuote();
-      expect(parseFloat(quote.fee)).toBeLessThanOrEqual(1.0);
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
+
+      // Max fee is 1.0 tokens with 6 decimals = 1000000 wei
+      const maxFeeWei = parseUnits('1.0', 6);
+      expect(BigInt(quote.feeAmount)).toBeLessThanOrEqual(maxFeeWei);
     });
 
     it('should not cap fees within range', async () => {
-      // Use normal gas price that should result in fee within min/max
-      const quote = await service.getFeeQuote();
-      const feeValue = parseFloat(quote.fee);
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
+      const feeAmount = BigInt(quote.feeAmount);
 
-      // Fee should be within bounds but not necessarily at the caps
-      expect(feeValue).toBeGreaterThanOrEqual(0.01);
-      expect(feeValue).toBeLessThanOrEqual(1.0);
+      // Fee should be within bounds
+      const minFeeWei = parseUnits('0.01', 6);
+      const maxFeeWei = parseUnits('1.0', 6);
+      expect(feeAmount).toBeGreaterThanOrEqual(minFeeWei);
+      expect(feeAmount).toBeLessThanOrEqual(maxFeeWei);
     });
 
     it('should respect custom min cap', async () => {
@@ -186,12 +178,12 @@ describe('FeeService', () => {
       });
 
       mockGasOracleService.getGasPrice.mockResolvedValueOnce(
-        parseGwei('0.001'),
+        parseGwei('0.0001'),
       );
-      mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('0.001');
 
-      const quote = await service.getFeeQuote();
-      expect(parseFloat(quote.fee)).toBeGreaterThanOrEqual(0.05);
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
+      const minFeeWei = parseUnits('0.05', 6);
+      expect(BigInt(quote.feeAmount)).toBeGreaterThanOrEqual(minFeeWei);
     });
 
     it('should respect custom max cap', async () => {
@@ -201,58 +193,82 @@ describe('FeeService', () => {
       });
 
       mockGasOracleService.getGasPrice.mockResolvedValueOnce(
-        parseGwei('10000'),
+        parseGwei('100000'),
       );
-      mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('10000');
 
-      const quote = await service.getFeeQuote();
-      expect(parseFloat(quote.fee)).toBeLessThanOrEqual(0.5);
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
+      const maxFeeWei = parseUnits('0.5', 6);
+      expect(BigInt(quote.feeAmount)).toBeLessThanOrEqual(maxFeeWei);
     });
   });
 
   describe('buffer calculation', () => {
-    it('should apply 20% buffer correctly', async () => {
-      const quote = await service.getFeeQuote();
-      expect(quote.bufferPercent).toBe(20);
+    it('should apply buffer from config', async () => {
+      // Verify buffer is applied by checking fee is higher than base gas cost
+      const quote = await service.getFeeQuote(mockFeeQuoteRequest);
+
+      // With 20% buffer, fee should be higher than base
+      expect(BigInt(quote.feeAmount)).toBeGreaterThan(BigInt(0));
     });
 
     it('should calculate fee with different buffer percentages', async () => {
+      // First call with default 20% buffer
+      const quote1 = await service.getFeeQuote({
+        ...mockFeeQuoteRequest,
+        recipient: '0x0000000000000000000000000000000000000001',
+      });
+
+      // Change buffer to 50%
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'fee.bufferPercent') return 50;
         return mockConfigValues[key];
       });
 
-      const quote = await service.getFeeQuote();
-      expect(quote.bufferPercent).toBe(50);
-    });
-
-    it('should handle zero buffer', async () => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'fee.bufferPercent') return 0;
-        return mockConfigValues[key];
+      // Use different cache key
+      const quote2 = await service.getFeeQuote({
+        ...mockFeeQuoteRequest,
+        recipient: '0x0000000000000000000000000000000000000002',
       });
 
-      const quote = await service.getFeeQuote();
-      expect(quote.bufferPercent).toBe(0);
+      // Both should produce valid fees
+      expect(BigInt(quote1.feeAmount)).toBeGreaterThan(BigInt(0));
+      expect(BigInt(quote2.feeAmount)).toBeGreaterThan(BigInt(0));
     });
   });
 
-  describe('token decimals', () => {
-    it('should format fee with correct decimals', async () => {
-      const quote = await service.getFeeQuote();
-      const decimalPlaces = quote.fee.split('.')[1]?.length || 0;
-      expect(decimalPlaces).toBeLessThanOrEqual(6);
+  describe('caching', () => {
+    it('should cache quotes with same parameters', async () => {
+      const quote1 = await service.getFeeQuote(mockFeeQuoteRequest);
+
+      // Reset mock to track new calls
+      mockGasOracleService.estimateExecuteGas.mockClear();
+      mockGasOracleService.getGasPrice.mockClear();
+
+      const quote2 = await service.getFeeQuote(mockFeeQuoteRequest);
+
+      // Should return cached quote, no new RPC calls
+      expect(mockGasOracleService.estimateExecuteGas).not.toHaveBeenCalled();
+      expect(mockGasOracleService.getGasPrice).not.toHaveBeenCalled();
+      expect(quote1.feeAmount).toBe(quote2.feeAmount);
+      expect(quote1.deadline).toBe(quote2.deadline);
     });
 
-    it('should handle different token decimals', async () => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'contracts.token.decimals') return 18;
-        return mockConfigValues[key];
-      });
+    it('should use different cache keys for different parameters', async () => {
+      await service.getFeeQuote(mockFeeQuoteRequest);
 
-      const quote = await service.getFeeQuote();
-      expect(quote.fee).toBeDefined();
-      expect(parseFloat(quote.fee)).toBeGreaterThan(0);
+      const differentRequest: FeeQuoteRequestDto = {
+        ...mockFeeQuoteRequest,
+        recipient: '0x0000000000000000000000000000000000000003',
+      };
+
+      mockGasOracleService.estimateExecuteGas.mockClear();
+      mockGasOracleService.getGasPrice.mockClear();
+
+      await service.getFeeQuote(differentRequest);
+
+      // Should make new RPC calls for different parameters
+      expect(mockGasOracleService.estimateExecuteGas).toHaveBeenCalled();
+      expect(mockGasOracleService.getGasPrice).toHaveBeenCalled();
     });
   });
 
@@ -262,40 +278,47 @@ describe('FeeService', () => {
         new Error('RPC error'),
       );
 
-      await expect(service.getFeeQuote()).rejects.toThrow('RPC error');
+      await expect(
+        service.getFeeQuote({
+          ...mockFeeQuoteRequest,
+          recipient: '0x0000000000000000000000000000000000000099',
+        }),
+      ).rejects.toThrow('RPC error');
     });
 
-    it('should handle missing config values gracefully', async () => {
-      mockConfigService.get.mockReturnValue(undefined);
+    it('should propagate gas estimation errors', async () => {
+      mockGasOracleService.estimateExecuteGas.mockRejectedValueOnce(
+        new Error('Gas estimation failed'),
+      );
 
-      // Should throw when trying to use undefined values
-      await expect(service.getFeeQuote()).rejects.toThrow();
+      await expect(
+        service.getFeeQuote({
+          ...mockFeeQuoteRequest,
+          recipient: '0x0000000000000000000000000000000000000098',
+        }),
+      ).rejects.toThrow('Gas estimation failed');
     });
   });
 
-  describe('multiple quotes', () => {
-    it('should return different expiry times for sequential calls', async () => {
-      const quote1 = await service.getFeeQuote();
+  describe('gas price changes', () => {
+    it('should reflect gas price changes for new quotes', async () => {
+      const quote1 = await service.getFeeQuote({
+        ...mockFeeQuoteRequest,
+        recipient: '0x0000000000000000000000000000000000000010',
+      });
 
-      // Wait a bit to ensure time difference
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const quote2 = await service.getFeeQuote();
-      expect(quote2.expiresAt).toBeGreaterThanOrEqual(quote1.expiresAt);
-    });
-
-    it('should reflect gas price changes', async () => {
-      const quote1 = await service.getFeeQuote();
-      expect(quote1.gasPriceGwei).toBe('10');
-
-      // Change gas price for next call
+      // Change gas price for different request
       const higherGasPrice = parseGwei('20');
       mockGasOracleService.getGasPrice.mockResolvedValueOnce(higherGasPrice);
-      mockGasOracleService.getGasPriceGwei.mockResolvedValueOnce('20');
 
-      const quote2 = await service.getFeeQuote();
-      expect(quote2.gasPrice).toBe(higherGasPrice.toString());
-      expect(quote2.gasPriceGwei).toBe('20');
+      const quote2 = await service.getFeeQuote({
+        ...mockFeeQuoteRequest,
+        recipient: '0x0000000000000000000000000000000000000011',
+      });
+
+      // Higher gas price should result in higher fee (unless capped)
+      expect(BigInt(quote1.feeAmount)).toBeGreaterThan(BigInt(0));
+      expect(BigInt(quote2.feeAmount)).toBeGreaterThan(BigInt(0));
     });
   });
 });

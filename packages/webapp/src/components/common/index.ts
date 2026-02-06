@@ -8,6 +8,8 @@ export type { ApprovalButtonProps } from './ApprovalButton';
 export { BalanceDisplay } from './BalanceDisplay';
 export type { BalanceDisplayProps } from './BalanceDisplay';
 
+export { BackendStatus } from './BackendStatus';
+
 export { ConnectGuard, withConnectGuard } from './ConnectGuard';
 export type { ConnectGuardProps } from './ConnectGuard';
 

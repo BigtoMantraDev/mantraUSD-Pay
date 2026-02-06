@@ -1,36 +1,31 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+/**
+ * Fee quote response matching frontend FeeQuote interface
+ * This quote is signed by the backend and can be verified by the relayer
+ */
 export class FeeQuoteDto {
-  @ApiProperty({ example: '0.05', description: 'Fee amount in token units' })
-  fee: string;
+  @ApiProperty({
+    example: '50000000000000000',
+    description: 'Fee amount in token wei (not decimal)',
+  })
+  feeAmount: string;
 
   @ApiProperty({
-    example: '0.05 mantraUSD',
-    description: 'Formatted fee with symbol',
+    example: '0x4B545d0758eda6601B051259bD977125fbdA7ba2',
+    description: 'Token address for fee payment (mantraUSD)',
   })
-  feeFormatted: string;
-
-  @ApiProperty({ example: '1000000000', description: 'Gas price in wei' })
-  gasPrice: string;
-
-  @ApiProperty({ example: '1.0', description: 'Gas price in gwei' })
-  gasPriceGwei: string;
-
-  @ApiProperty({ example: 150000, description: 'Estimated gas units' })
-  estimatedGas: number;
-
-  @ApiProperty({ example: 20, description: 'Fee buffer percentage' })
-  bufferPercent: number;
+  feeToken: string;
 
   @ApiProperty({
     example: 1706832000,
-    description: 'Unix timestamp when quote expires',
+    description: 'Unix timestamp when quote expires (in seconds)',
   })
-  expiresAt: number;
+  deadline: number;
 
   @ApiProperty({
-    example: true,
-    description: 'Whether fee charging is enabled',
+    example: '0x1234...abcd',
+    description: 'Backend signature authorizing this fee quote',
   })
-  enabled: boolean;
+  signature: string;
 }

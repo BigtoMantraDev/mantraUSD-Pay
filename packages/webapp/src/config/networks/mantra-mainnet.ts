@@ -37,6 +37,11 @@ export const mantraMainnetConfig: ChainConfig = {
     omToken: '0x0000000000000000000000000000000000000000',
     stakingPool: '0x0000000000000000000000000000000000000000',
     migrationHelper: '0x0000000000000000000000000000000000000000',
+    delegatedAccount: '0x0000000000000000000000000000000000000000',
+    mantraUSD: '0xd2b95283011E47257917770D28Bb3EE44c849f6F',
+  },
+  backend: {
+    url: 'https://relayer.mantrachain.io',
   },
   ui: {
     color: 'brand-blue',

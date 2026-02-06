@@ -12,8 +12,10 @@ import { Button, type ButtonProps } from '@/components/ui/button';
 import { useTokenAllowance } from '@/hooks/useTokenAllowance';
 import { cn } from '@/lib/utils';
 
-export interface ApprovalButtonProps
-  extends Omit<ButtonProps, 'onClick' | 'onError'> {
+export interface ApprovalButtonProps extends Omit<
+  ButtonProps,
+  'onClick' | 'onError'
+> {
   /** Token contract address to approve */
   tokenAddress: Address;
   /** Spender address (contract that will spend tokens) */

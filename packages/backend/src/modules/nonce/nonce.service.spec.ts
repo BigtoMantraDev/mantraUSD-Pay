@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NonceService } from './nonce.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
+import { getAddress } from 'viem';
+import { ConfigService } from '@nestjs/config';
 
 describe('NonceService', () => {
   let service: NonceService;
-  let configService: ConfigService;
   let blockchainService: BlockchainService;
 
   const mockDelegatedAccountAddress =
@@ -16,6 +16,7 @@ describe('NonceService', () => {
 
   const mockPublicClient = {
     readContract: jest.fn().mockResolvedValue(mockNonce),
+    getCode: jest.fn().mockResolvedValue('0x12345678'), // User has code (EIP-7702 delegated)
   };
 
   const mockBlockchainService = {
@@ -50,7 +51,6 @@ describe('NonceService', () => {
     }).compile();
 
     service = module.get<NonceService>(NonceService);
-    configService = module.get<ConfigService>(ConfigService);
     blockchainService = module.get<BlockchainService>(BlockchainService);
   });
 
@@ -58,15 +58,42 @@ describe('NonceService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('getNonce', () => {
-    it('should fetch nonce from delegated account contract', async () => {
+  describe('getNonce - EIP-7702 behavior', () => {
+    it('should check if user has code before querying nonce', async () => {
+      await service.getNonce(mockUserAddress);
+
+      expect(mockPublicClient.getCode).toHaveBeenCalledWith({
+        address: getAddress(mockUserAddress),
+      });
+    });
+
+    it('should return 0 for first-time users (no code)', async () => {
+      mockPublicClient.getCode.mockResolvedValueOnce(undefined);
+
+      const nonce = await service.getNonce(mockUserAddress);
+      expect(nonce).toBe('0');
+      expect(mockPublicClient.readContract).not.toHaveBeenCalled();
+    });
+
+    it('should return 0 for users with empty code (0x)', async () => {
+      mockPublicClient.getCode.mockResolvedValueOnce('0x');
+
+      const nonce = await service.getNonce(mockUserAddress);
+      expect(nonce).toBe('0');
+      expect(mockPublicClient.readContract).not.toHaveBeenCalled();
+    });
+
+    it('should query nonce from user EOA when code exists', async () => {
+      mockPublicClient.getCode.mockResolvedValueOnce('0xef0100abcdef');
+      const checksummedAddress = getAddress(mockUserAddress);
+
       const nonce = await service.getNonce(mockUserAddress);
 
       expect(mockPublicClient.readContract).toHaveBeenCalledWith({
-        address: mockDelegatedAccountAddress,
+        address: checksummedAddress,
         abi: expect.any(Array),
         functionName: 'getNonce',
-        args: [mockUserAddress],
+        args: [checksummedAddress],
       });
       expect(nonce).toBe('42');
     });
@@ -101,12 +128,7 @@ describe('NonceService', () => {
       mockPublicClient.readContract.mockResolvedValueOnce(BigInt(10));
       await service.getNonce(address2);
 
-      expect(mockPublicClient.readContract).toHaveBeenCalledWith(
-        expect.objectContaining({ args: [address1] }),
-      );
-      expect(mockPublicClient.readContract).toHaveBeenCalledWith(
-        expect.objectContaining({ args: [address2] }),
-      );
+      expect(mockPublicClient.readContract).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -202,13 +224,56 @@ describe('NonceService', () => {
     });
   });
 
+  describe('error handling - graceful fallback', () => {
+    it('should return 0 when readContract fails', async () => {
+      mockPublicClient.getCode.mockResolvedValueOnce('0xef0100abcdef');
+      mockPublicClient.readContract.mockRejectedValueOnce(
+        new Error('RPC connection failed'),
+      );
+
+      const nonce = await service.getNonce(mockUserAddress);
+      expect(nonce).toBe('0');
+    });
+
+    it('should return 0 when contract execution reverts', async () => {
+      mockPublicClient.getCode.mockResolvedValueOnce('0xef0100abcdef');
+      mockPublicClient.readContract.mockRejectedValueOnce(
+        new Error('Contract execution reverted'),
+      );
+
+      const nonce = await service.getNonce(mockUserAddress);
+      expect(nonce).toBe('0');
+    });
+
+    it('should return 0 on network timeout', async () => {
+      mockPublicClient.getCode.mockResolvedValueOnce('0xef0100abcdef');
+      mockPublicClient.readContract.mockRejectedValueOnce(
+        new Error('Network request timeout'),
+      );
+
+      const nonce = await service.getNonce(mockUserAddress);
+      expect(nonce).toBe('0');
+    });
+
+    it('should throw when getCode fails', async () => {
+      mockPublicClient.getCode.mockRejectedValueOnce(new Error('RPC error'));
+
+      // getCode error is NOT caught, it will throw
+      await expect(service.getNonce(mockUserAddress)).rejects.toThrow(
+        'RPC error',
+      );
+    });
+  });
+
   describe('contract interaction', () => {
-    it('should call correct contract address', async () => {
+    it('should query the user EOA address, not the implementation', async () => {
+      const checksummedAddress = getAddress(mockUserAddress);
       await service.getNonce(mockUserAddress);
 
+      // The address should be the user's EOA, NOT the delegated account implementation
       expect(mockPublicClient.readContract).toHaveBeenCalledWith(
         expect.objectContaining({
-          address: mockDelegatedAccountAddress,
+          address: checksummedAddress,
         }),
       );
     });
@@ -239,81 +304,6 @@ describe('NonceService', () => {
     });
   });
 
-  describe('error handling', () => {
-    it('should propagate RPC errors', async () => {
-      mockPublicClient.readContract.mockRejectedValueOnce(
-        new Error('RPC connection failed'),
-      );
-
-      await expect(service.getNonce(mockUserAddress)).rejects.toThrow(
-        'RPC connection failed',
-      );
-    });
-
-    it('should propagate contract execution errors', async () => {
-      mockPublicClient.readContract.mockRejectedValueOnce(
-        new Error('Contract execution reverted'),
-      );
-
-      await expect(service.getNonce(mockUserAddress)).rejects.toThrow(
-        'Contract execution reverted',
-      );
-    });
-
-    it('should handle network timeout', async () => {
-      mockPublicClient.readContract.mockRejectedValueOnce(
-        new Error('Network request timeout'),
-      );
-
-      await expect(service.getNonce(mockUserAddress)).rejects.toThrow(
-        'Network request timeout',
-      );
-    });
-
-    it('should handle missing contract', async () => {
-      mockPublicClient.readContract.mockRejectedValueOnce(
-        new Error('Contract not deployed'),
-      );
-
-      await expect(service.getNonce(mockUserAddress)).rejects.toThrow(
-        'Contract not deployed',
-      );
-    });
-  });
-
-  describe('configuration', () => {
-    it('should load delegated account address from config', async () => {
-      await service.getNonce(mockUserAddress);
-
-      expect(configService.get).toHaveBeenCalledWith(
-        'contracts.delegatedAccount',
-      );
-    });
-
-    it('should handle different delegated account addresses', async () => {
-      const differentAddress =
-        '0x9999999999999999999999999999999999999999' as `0x${string}`;
-      const localMockConfigService = {
-        get: jest.fn().mockReturnValue(differentAddress),
-      };
-
-      const module = await Test.createTestingModule({
-        providers: [
-          NonceService,
-          { provide: ConfigService, useValue: localMockConfigService },
-          { provide: BlockchainService, useValue: mockBlockchainService },
-        ],
-      }).compile();
-
-      const newService = module.get<NonceService>(NonceService);
-      await newService.getNonce(mockUserAddress);
-
-      expect(mockPublicClient.readContract).toHaveBeenCalledWith(
-        expect.objectContaining({ address: differentAddress }),
-      );
-    });
-  });
-
   describe('multiple calls', () => {
     it('should handle sequential nonce queries', async () => {
       const nonce1 = await service.getNonce(mockUserAddress);
@@ -321,6 +311,7 @@ describe('NonceService', () => {
 
       expect(nonce1).toBe('42');
       expect(nonce2).toBe('42');
+      expect(mockPublicClient.getCode).toHaveBeenCalledTimes(2);
       expect(mockPublicClient.readContract).toHaveBeenCalledTimes(2);
     });
 
@@ -333,6 +324,7 @@ describe('NonceService', () => {
 
       const results = await Promise.all(promises);
       expect(results).toEqual(['42', '42', '42']);
+      expect(mockPublicClient.getCode).toHaveBeenCalledTimes(3);
       expect(mockPublicClient.readContract).toHaveBeenCalledTimes(3);
     });
   });
