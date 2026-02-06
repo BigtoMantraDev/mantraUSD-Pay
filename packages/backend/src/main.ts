@@ -56,12 +56,10 @@ async function bootstrap() {
   app.use(
     '/api/scalar',
     apiReference({
-      spec: {
-        content: document,
-      },
+      content: document,
       url: '/openapi.json',
       withFastify: true, // Required when using Fastify adapter
-      theme: 'pink',
+      theme: 'purple',
       metaData: {
         title: 'mantraUSD-Pay API',
       },

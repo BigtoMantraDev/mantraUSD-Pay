@@ -16,6 +16,10 @@ import {
   encodeAbiParameters,
   parseAbiParameters,
   formatEther,
+  encodeFunctionData,
+  toBytes,
+  concat,
+  type SignedAuthorization,
 } from 'viem';
 
 @Injectable()
@@ -145,25 +149,27 @@ export class RelayService {
   }
 
   private computeDigest(request: RelayRequestDto): `0x${string}` {
-    const delegatedAccountAddress = this.configService.get<`0x${string}`>(
+    // Use the DelegatedAccount implementation contract as verifyingContract
+    // This matches the frontend and contract domain separator
+    const verifyingContract = this.configService.get<`0x${string}`>(
       'contracts.delegatedAccount',
     )!;
 
-    // Compute domain separator
+    // Compute domain separator using implementation contract as verifyingContract
     const domainSeparator = keccak256(
       encodeAbiParameters(
         parseAbiParameters('bytes32, bytes32, bytes32, uint256, address'),
         [
           this.DOMAIN_TYPEHASH,
-          keccak256(Buffer.from('DelegatedAccount')),
-          keccak256(Buffer.from('1')),
+          keccak256(toBytes('DelegatedAccount')),
+          keccak256(toBytes('1')),
           BigInt(request.chainId),
-          delegatedAccountAddress,
+          verifyingContract,
         ],
       ),
     );
 
-    // Compute intent hash
+    // Compute intent hash (matches contract's INTENT_TYPEHASH - without account)
     const intentHash = keccak256(
       encodeAbiParameters(
         parseAbiParameters(
@@ -180,18 +186,9 @@ export class RelayService {
       ),
     );
 
-    // Compute final digest
-    const digest = keccak256(
-      encodeAbiParameters(
-        parseAbiParameters('bytes1, bytes1, bytes32, bytes32'),
-        [
-          '0x19' as `0x${string}`,
-          '0x01' as `0x${string}`,
-          domainSeparator,
-          intentHash,
-        ],
-      ),
-    );
+    // Compute final EIP-712 digest using raw concatenation (NOT ABI encoding!)
+    // The format is: keccak256("\x19\x01" || domainSeparator || structHash)
+    const digest = keccak256(concat(['0x1901', domainSeparator, intentHash]));
 
     return digest;
   }
@@ -206,7 +203,7 @@ export class RelayService {
       'contracts.delegatedAccount',
     )!;
 
-    // Build transaction to call DelegatedAccount.execute()
+    // EIP-7702 execute ABI - simplified since address(this) is the user's EOA with delegation
     const executeAbi = [
       {
         inputs: [
@@ -224,9 +221,8 @@ export class RelayService {
       },
     ] as const;
 
-    // Estimate gas
-    const gasEstimate = await publicClient.estimateContractGas({
-      address: delegatedAccountAddress,
+    // Prepare function call data
+    const functionData = encodeFunctionData({
       abi: executeAbi,
       functionName: 'execute',
       args: [
@@ -237,25 +233,60 @@ export class RelayService {
         BigInt(request.intent.deadline),
         request.signature as `0x${string}`,
       ],
-      account: relayerAccount,
     });
 
-    // Send transaction
-    const hash = await walletClient.writeContract({
-      address: delegatedAccountAddress,
-      abi: executeAbi,
-      functionName: 'execute',
-      args: [
-        request.intent.destination as `0x${string}`,
-        BigInt(request.intent.value),
-        request.intent.data as `0x${string}`,
-        BigInt(request.intent.nonce),
-        BigInt(request.intent.deadline),
-        request.signature as `0x${string}`,
-      ],
+    // Build authorization list if provided (for EIP-7702 Type 4 transaction)
+    const authorizationList: SignedAuthorization[] = [];
+    if (request.authorization) {
+      authorizationList.push({
+        chainId: request.authorization.chainId,
+        address: request.authorization.contractAddress as `0x${string}`,
+        nonce: parseInt(request.authorization.nonce, 10),
+        r: request.authorization.r as `0x${string}`,
+        s: request.authorization.s as `0x${string}`,
+        yParity: request.authorization.yParity as 0 | 1,
+      });
+    }
+
+    // With EIP-7702, the user's EOA temporarily has the DelegatedAccount code
+    // So we call the user's address directly (it behaves as the contract)
+    const targetAddress = request.userAddress as `0x${string}`;
+
+    // Estimate gas for the EIP-7702 transaction
+    // Many RPC nodes don't yet support authorizationList in eth_estimateGas,
+    // so we use a fallback gas estimate from config if estimation fails
+    let gasEstimate: bigint;
+    try {
+      gasEstimate = await publicClient.estimateGas({
+        account: relayerAccount,
+        to: targetAddress,
+        data: functionData,
+        authorizationList:
+          authorizationList.length > 0 ? authorizationList : undefined,
+      });
+      this.logger.debug(`Gas estimated via RPC: ${gasEstimate}`);
+    } catch (estimateError) {
+      // Fall back to configured gas estimate when EIP-7702 estimation fails
+      const fallbackGas = BigInt(
+        this.configService.get<number>('fee.estimatedGas') || 300000,
+      );
+      this.logger.warn(
+        `Gas estimation failed (likely EIP-7702 not supported in eth_estimateGas), using fallback: ${fallbackGas}`,
+      );
+      this.logger.debug(`Estimation error: ${estimateError.message}`);
+      gasEstimate = fallbackGas;
+    }
+
+    // Send EIP-7702 Type 4 transaction
+    // The authorization list temporarily designates the DelegatedAccount contract onto the user's EOA
+    const hash = await walletClient.sendTransaction({
       account: relayerAccount,
+      to: targetAddress,
+      data: functionData,
       gas: gasEstimate,
       chain: publicClient.chain,
+      authorizationList:
+        authorizationList.length > 0 ? authorizationList : undefined,
     });
 
     return hash;
