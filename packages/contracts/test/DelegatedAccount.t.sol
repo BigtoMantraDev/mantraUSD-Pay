@@ -393,7 +393,8 @@ contract DelegatedAccountTest is Test {
         uint256 deadline = block.timestamp + 1 hours;
 
         // Sign with owner's key (smart wallet owner)
-        bytes memory signature = _signExecuteForEOA(ownerPrivateKey, address(smartWallet), destination, value, data, nonce, deadline);
+        bytes memory signature =
+            _signExecuteForEOA(ownerPrivateKey, address(smartWallet), destination, value, data, nonce, deadline);
 
         // Execute - signature verification should use EIP-1271
         delegatedWallet.execute(destination, value, data, nonce, deadline, signature);
@@ -622,8 +623,7 @@ contract DelegatedAccountTest is Test {
         );
 
         // Intent structure (without account parameter)
-        bytes32 structHash =
-            keccak256(abi.encode(INTENT_TYPEHASH, destination, value, keccak256(data), nonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(INTENT_TYPEHASH, destination, value, keccak256(data), nonce, deadline));
 
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSep, structHash));
 
@@ -648,8 +648,7 @@ contract DelegatedAccountTest is Test {
         view
         returns (bytes memory)
     {
-        bytes32 structHash =
-            keccak256(abi.encode(INTENT_TYPEHASH, destination, value, keccak256(data), nonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(INTENT_TYPEHASH, destination, value, keccak256(data), nonce, deadline));
 
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", delegatedAccount.domainSeparator(), structHash));
 
