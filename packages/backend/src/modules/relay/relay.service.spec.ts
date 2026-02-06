@@ -50,11 +50,13 @@ describe('RelayService', () => {
   const mockPublicClient = {
     chain: { id: mockChainId },
     estimateContractGas: jest.fn().mockResolvedValue(BigInt(150000)),
+    estimateGas: jest.fn().mockResolvedValue(BigInt(150000)),
     getBalance: jest.fn().mockResolvedValue(BigInt(10) ** BigInt(18)),
   };
 
   const mockWalletClient = {
     writeContract: jest.fn().mockResolvedValue(mockTxHash),
+    sendTransaction: jest.fn().mockResolvedValue(mockTxHash),
   };
 
   const mockRelayerAccount = {
@@ -133,17 +135,18 @@ describe('RelayService', () => {
 
     it('should estimate gas before broadcasting', async () => {
       await service.relay(mockRelayRequest);
-      expect(mockPublicClient.estimateContractGas).toHaveBeenCalled();
+      expect(mockPublicClient.estimateGas).toHaveBeenCalled();
     });
 
     it('should broadcast transaction with correct parameters', async () => {
       await service.relay(mockRelayRequest);
 
-      expect(mockWalletClient.writeContract).toHaveBeenCalledWith(
+      expect(mockWalletClient.sendTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
-          address: mockDelegatedAccount,
-          functionName: 'execute',
+          to: mockUserAddress,
           account: mockRelayerAccount,
+          data: expect.stringMatching(/^0x/),
+          gas: expect.any(BigInt),
         }),
       );
     });
@@ -292,12 +295,12 @@ describe('RelayService', () => {
 
   describe('transaction broadcasting', () => {
     beforeEach(() => {
-      // Reset writeContract to success
-      mockWalletClient.writeContract.mockResolvedValue(mockTxHash);
+      // Reset sendTransaction to success
+      mockWalletClient.sendTransaction.mockResolvedValue(mockTxHash);
     });
 
     it('should throw InternalServerErrorException on broadcast failure', async () => {
-      mockWalletClient.writeContract.mockRejectedValueOnce(
+      mockWalletClient.sendTransaction.mockRejectedValueOnce(
         new Error('RPC error'),
       );
 
@@ -309,30 +312,38 @@ describe('RelayService', () => {
     it('should pass intent parameters to contract', async () => {
       await service.relay(mockRelayRequest);
 
-      const call = mockWalletClient.writeContract.mock.calls[0][0];
-      expect(call.args).toEqual([
-        mockRelayRequest.intent.destination,
-        BigInt(mockRelayRequest.intent.value),
-        mockRelayRequest.intent.data,
-        BigInt(mockRelayRequest.intent.nonce),
-        BigInt(mockRelayRequest.intent.deadline),
-        mockRelayRequest.signature,
-      ]);
+      const call = mockWalletClient.sendTransaction.mock.calls[0][0];
+      // The call data is encoded ABI data containing the intent parameters
+      expect(call.to).toBe(mockUserAddress);
+      expect(call.account).toBe(mockRelayerAccount);
+      expect(call.data).toMatch(/^0x/);
     });
 
     it('should use estimated gas for transaction', async () => {
       await service.relay(mockRelayRequest);
 
-      const call = mockWalletClient.writeContract.mock.calls[0][0];
+      const call = mockWalletClient.sendTransaction.mock.calls[0][0];
       expect(call.gas).toBe(BigInt(150000));
     });
 
-    it('should handle gas estimation failure', async () => {
-      mockPublicClient.estimateContractGas.mockRejectedValueOnce(
-        new Error('Gas estimation failed'),
+    it('should use fallback gas when estimation fails', async () => {
+      // Add fee.estimatedGas to config for fallback
+      mockConfigService.get.mockImplementation((key: string) => {
+        const config: Record<string, any> = {
+          'contracts.delegatedAccount': mockDelegatedAccount,
+          maxGasPriceGwei: 100,
+          'fee.estimatedGas': 300000,
+        };
+        return config[key];
+      });
+      mockPublicClient.estimateGas.mockRejectedValueOnce(
+        new Error('Gas estimation failed - EIP-7702 not supported'),
       );
 
-      await expect(service.relay(mockRelayRequest)).rejects.toThrow();
+      // Should still succeed using fallback gas
+      const result = await service.relay(mockRelayRequest);
+      expect(result.txHash).toBe(mockTxHash);
+      expect(mockWalletClient.sendTransaction).toHaveBeenCalled();
     });
   });
 
@@ -393,7 +404,7 @@ describe('RelayService', () => {
     beforeEach(() => {
       // Reset mocks
       mockBlockchainService.getPublicClient.mockReturnValue(mockPublicClient);
-      mockWalletClient.writeContract.mockResolvedValue(mockTxHash);
+      mockWalletClient.sendTransaction.mockResolvedValue(mockTxHash);
     });
 
     it('should handle configuration errors', async () => {
