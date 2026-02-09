@@ -40,8 +40,7 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
         keccak256("BatchedIntent(Call[] calls,uint256 nonce,uint256 deadline)Call(address destination,uint256 value,bytes data)");
 
     /// @notice EIP-712 typehash for Call (used in BatchedIntent)
-    bytes32 public constant CALL_TYPEHASH =
-        keccak256("Call(address destination,uint256 value,bytes data)");
+    bytes32 public constant CALL_TYPEHASH = keccak256("Call(address destination,uint256 value,bytes data)");
 
     /// @notice EIP-1271 magic value indicating a valid signature
     bytes4 private constant EIP1271_MAGIC_VALUE = 0x1626ba7e;
@@ -51,13 +50,13 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
     /// @notice The implementation contract address (used for EIP-712 domain)
     /// @dev With EIP-7702, address(this) varies per delegation, but the domain
     ///      should use a consistent verifyingContract for signature verification.
-    address private immutable _implementation;
+    address private immutable _IMPLEMENTATION;
 
     /// @notice Cached domain separator (uses implementation address)
-    bytes32 private immutable _cachedDomainSeparator;
+    bytes32 private immutable _CACHED_DOMAIN_SEPARATOR;
 
     /// @notice Chain ID at deployment (for domain separator validation)
-    uint256 private immutable _cachedChainId;
+    uint256 private immutable _CACHED_CHAIN_ID;
 
     // ============ State ============
 
@@ -78,9 +77,9 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
 
     constructor() {
         // Store implementation address for consistent EIP-712 domain
-        _implementation = address(this);
-        _cachedChainId = block.chainid;
-        _cachedDomainSeparator = _computeDomainSeparator(_implementation);
+        _IMPLEMENTATION = address(this);
+        _CACHED_CHAIN_ID = block.chainid;
+        _CACHED_DOMAIN_SEPARATOR = _computeDomainSeparator(_IMPLEMENTATION);
     }
 
     // ============ External Functions ============
@@ -276,10 +275,10 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
      */
     function domainSeparator() public view returns (bytes32) {
         // Use cached if chain ID matches, otherwise recompute
-        if (block.chainid == _cachedChainId) {
-            return _cachedDomainSeparator;
+        if (block.chainid == _CACHED_CHAIN_ID) {
+            return _CACHED_DOMAIN_SEPARATOR;
         }
-        return _computeDomainSeparator(_implementation);
+        return _computeDomainSeparator(_IMPLEMENTATION);
     }
 
     /**
@@ -287,7 +286,7 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
      * @return The implementation address
      */
     function implementation() external view returns (address) {
-        return _implementation;
+        return _IMPLEMENTATION;
     }
 
     // ============ Internal Functions ============
@@ -299,34 +298,16 @@ contract DelegatedAccount is IDelegatedAccount, ReentrancyGuard {
      * @param deadline The deadline for signature expiry
      * @return The struct hash
      */
-    function _computeBatchedIntentHash(
-        Call[] calldata calls,
-        uint256 nonce,
-        uint256 deadline
-    ) private pure returns (bytes32) {
+    function _computeBatchedIntentHash(Call[] calldata calls, uint256 nonce, uint256 deadline) private pure returns (bytes32) {
         // Compute hash of calls array
         bytes32[] memory callHashes = new bytes32[](calls.length);
         for (uint256 i = 0; i < calls.length; i++) {
-            callHashes[i] = keccak256(
-                abi.encode(
-                    CALL_TYPEHASH,
-                    calls[i].destination,
-                    calls[i].value,
-                    keccak256(calls[i].data)
-                )
-            );
+            callHashes[i] = keccak256(abi.encode(CALL_TYPEHASH, calls[i].destination, calls[i].value, keccak256(calls[i].data)));
         }
         bytes32 callsHash = keccak256(abi.encodePacked(callHashes));
 
         // Compute BatchedIntent struct hash
-        return keccak256(
-            abi.encode(
-                BATCHED_INTENT_TYPEHASH,
-                callsHash,
-                nonce,
-                deadline
-            )
-        );
+        return keccak256(abi.encode(BATCHED_INTENT_TYPEHASH, callsHash, nonce, deadline));
     }
 
     /**
