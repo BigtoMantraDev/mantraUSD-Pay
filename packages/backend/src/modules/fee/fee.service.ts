@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { keccak256, parseUnits, toHex } from 'viem';
+import { parseUnits, verifyTypedData } from 'viem';
 import { GasOracleService } from '../blockchain/gas-oracle.service';
 import { RelayerWalletService } from '../blockchain/relayer-wallet.service';
 import { FeeQuoteDto } from './dto/fee-quote.dto';
@@ -14,11 +14,28 @@ export class FeeService {
     { quote: FeeQuoteDto; expiresAt: number }
   >();
 
+  private readonly FEE_QUOTE_TYPES = {
+    FeeQuote: [
+      { name: 'feeToken', type: 'address' },
+      { name: 'feeAmount', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+    ],
+  } as const;
+
   constructor(
     private configService: ConfigService,
     private gasOracleService: GasOracleService,
     private relayerWalletService: RelayerWalletService,
   ) {}
+
+  private getFeeQuoteDomain() {
+    return {
+      name: 'MantraUSD Pay' as const,
+      version: '1' as const,
+      chainId: this.configService.get<number>('chain.id')!,
+      verifyingContract: this.relayerWalletService.getAddress(),
+    };
+  }
 
   async getFeeQuote(params: FeeQuoteRequestDto): Promise<FeeQuoteDto> {
     // Check cache first (3-second TTL)
@@ -44,7 +61,6 @@ export class FeeService {
     const feeTokenAddress = this.configService.get<string>(
       'contracts.token.address',
     )!;
-    this.configService.get<string>('relayer.privateKey')!;
 
     // Estimate actual gas for this specific transfer
     const estimatedGas = await this.gasOracleService.estimateExecuteGas({
@@ -85,14 +101,18 @@ export class FeeService {
 
     const deadline = Math.floor(Date.now() / 1000) + quoteTtlSeconds;
 
-    // Sign the quote (hash of feeAmount + feeToken + deadline)
-    const messageHash = keccak256(
-      toHex(`${feeWei.toString()}-${feeTokenAddress}-${deadline}`),
-    );
-
-    // TODO: Implement proper EIP-712 signing with relayer private key
-    // For now, use a simple signature (replace with actual signing logic)
-    const signature = `0x${messageHash.slice(2)}${'00'.repeat(32)}`;
+    // Sign the quote using EIP-712 typed data with the relayer's private key
+    const account = this.relayerWalletService.getAccount();
+    const signature = await account.signTypedData({
+      domain: this.getFeeQuoteDomain(),
+      types: this.FEE_QUOTE_TYPES,
+      primaryType: 'FeeQuote',
+      message: {
+        feeToken: feeTokenAddress as `0x${string}`,
+        feeAmount: feeWei,
+        deadline: BigInt(deadline),
+      },
+    });
 
     this.logger.debug(
       `Fee quote: ${feeWei.toString()} token wei (gas: ${estimatedGas}, gasPrice: ${gasPrice}, OM/USD: $${omPriceUsd})`,
@@ -131,19 +151,19 @@ export class FeeService {
   }
 
   /**
-   * Verify a fee quote signature
+   * Verify a fee quote EIP-712 signature
    * @param feeAmount The fee amount in wei
    * @param feeToken The fee token address
    * @param deadline The deadline timestamp
-   * @param signature The signature to verify
+   * @param signature The EIP-712 signature to verify
    * @returns true if the signature is valid and deadline hasn't expired
    */
-  verifyFeeQuote(
+  async verifyFeeQuote(
     feeAmount: string,
     feeToken: string,
     deadline: number,
     signature: string,
-  ): boolean {
+  ): Promise<boolean> {
     // Check deadline hasn't expired
     const now = Math.floor(Date.now() / 1000);
     if (deadline <= now) {
@@ -151,18 +171,29 @@ export class FeeService {
       return false;
     }
 
-    // Recompute the expected signature hash
-    const expectedMessageHash = keccak256(
-      toHex(`${feeAmount}-${feeToken}-${deadline}`),
-    );
-    const expectedSignature = `0x${expectedMessageHash.slice(2)}${'00'.repeat(32)}`;
+    try {
+      const valid = await verifyTypedData({
+        address: this.relayerWalletService.getAddress(),
+        domain: this.getFeeQuoteDomain(),
+        types: this.FEE_QUOTE_TYPES,
+        primaryType: 'FeeQuote',
+        message: {
+          feeToken: feeToken as `0x${string}`,
+          feeAmount: BigInt(feeAmount),
+          deadline: BigInt(deadline),
+        },
+        signature: signature as `0x${string}`,
+      });
 
-    // Compare signatures
-    if (signature !== expectedSignature) {
-      this.logger.warn('Fee quote signature mismatch');
+      if (!valid) {
+        this.logger.warn('Fee quote signature verification failed');
+      }
+      return valid;
+    } catch (error) {
+      this.logger.warn(
+        `Fee quote signature verification error: ${error instanceof Error ? error.message : error}`,
+      );
       return false;
     }
-
-    return true;
   }
 }

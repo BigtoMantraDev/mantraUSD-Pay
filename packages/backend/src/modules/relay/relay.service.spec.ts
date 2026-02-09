@@ -90,7 +90,7 @@ describe('RelayService', () => {
   };
 
   const mockFeeService = {
-    verifyFeeQuote: jest.fn().mockReturnValue(true),
+    verifyFeeQuote: jest.fn().mockResolvedValue(true),
     getFeeQuote: jest.fn(),
   };
 
@@ -554,8 +554,8 @@ describe('RelayService', () => {
 
       it('should reject when fee quote is invalid', async () => {
         mockFeeService.verifyFeeQuote
-          .mockReturnValueOnce(false)
-          .mockReturnValueOnce(false);
+          .mockResolvedValueOnce(false)
+          .mockResolvedValueOnce(false);
 
         await expect(service.relay(mockFeeRequest)).rejects.toThrow(
           BadRequestException,
@@ -566,7 +566,7 @@ describe('RelayService', () => {
       });
 
       it('should reject when fee quote has expired', async () => {
-        mockFeeService.verifyFeeQuote.mockReturnValueOnce(false);
+        mockFeeService.verifyFeeQuote.mockResolvedValueOnce(false);
 
         await expect(service.relay(mockFeeRequest)).rejects.toThrow(
           BadRequestException,

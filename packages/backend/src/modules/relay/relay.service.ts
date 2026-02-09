@@ -179,7 +179,7 @@ export class RelayService {
 
     // Verify fee quote signature
     const feeDeadline = parseInt(request.intent.deadline, 10);
-    const isValidFee = this.feeService.verifyFeeQuote(
+    const isValidFee = await this.feeService.verifyFeeQuote(
       fee.feeAmount,
       fee.feeToken,
       feeDeadline,
@@ -538,7 +538,7 @@ export class RelayService {
         ],
         name: 'executeBatch',
         outputs: [{ name: '', type: 'bytes[]' }],
-        stateMutability: 'payable',
+        stateMutability: 'nonpayable',
         type: 'function',
       },
     ] as const;
