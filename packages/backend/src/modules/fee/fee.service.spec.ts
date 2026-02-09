@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { FeeService } from './fee.service';
 import { GasOracleService } from '../blockchain/gas-oracle.service';
+import { RelayerWalletService } from '../blockchain/relayer-wallet.service';
 import { FeeQuoteRequestDto } from './dto/fee-quote-request.dto';
 import { parseGwei, parseUnits } from 'viem';
 
@@ -11,9 +12,11 @@ describe('FeeService', () => {
 
   const mockGasPrice = parseGwei('10');
   const mockEstimatedGas = BigInt(150000);
+  const mockOmPriceUsd = 0.5; // $0.50 per OM
   const mockTokenAddress = '0x4B545d0758eda6601B051259bD977125fbdA7ba2';
   const mockRecipient = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5';
   const mockSender = '0x1234567890123456789012345678901234567890';
+  const mockRelayerAddress = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
   const mockConfigValues: Record<string, any> = {
     'fee.bufferPercent': 20,
@@ -33,6 +36,11 @@ describe('FeeService', () => {
   const mockGasOracleService = {
     getGasPrice: jest.fn().mockResolvedValue(mockGasPrice),
     estimateExecuteGas: jest.fn().mockResolvedValue(mockEstimatedGas),
+    getOmPriceUsd: jest.fn().mockResolvedValue(mockOmPriceUsd),
+  };
+
+  const mockRelayerWalletService = {
+    getAddress: jest.fn().mockReturnValue(mockRelayerAddress),
   };
 
   const mockFeeQuoteRequest: FeeQuoteRequestDto = {
@@ -51,6 +59,8 @@ describe('FeeService', () => {
     );
     mockGasOracleService.getGasPrice.mockResolvedValue(mockGasPrice);
     mockGasOracleService.estimateExecuteGas.mockResolvedValue(mockEstimatedGas);
+    mockGasOracleService.getOmPriceUsd.mockResolvedValue(mockOmPriceUsd);
+    mockRelayerWalletService.getAddress.mockReturnValue(mockRelayerAddress);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -62,6 +72,10 @@ describe('FeeService', () => {
         {
           provide: GasOracleService,
           useValue: mockGasOracleService,
+        },
+        {
+          provide: RelayerWalletService,
+          useValue: mockRelayerWalletService,
         },
       ],
     }).compile();
@@ -82,6 +96,8 @@ describe('FeeService', () => {
       expect(quote).toHaveProperty('feeToken');
       expect(quote).toHaveProperty('deadline');
       expect(quote).toHaveProperty('signature');
+      expect(quote).toHaveProperty('relayerAddress');
+      expect(quote.relayerAddress).toBe(mockRelayerAddress);
     });
 
     it('should estimate gas for the specific transfer', async () => {
@@ -243,12 +259,14 @@ describe('FeeService', () => {
       // Reset mock to track new calls
       mockGasOracleService.estimateExecuteGas.mockClear();
       mockGasOracleService.getGasPrice.mockClear();
+      mockGasOracleService.getOmPriceUsd.mockClear();
 
       const quote2 = await service.getFeeQuote(mockFeeQuoteRequest);
 
       // Should return cached quote, no new RPC calls
       expect(mockGasOracleService.estimateExecuteGas).not.toHaveBeenCalled();
       expect(mockGasOracleService.getGasPrice).not.toHaveBeenCalled();
+      expect(mockGasOracleService.getOmPriceUsd).not.toHaveBeenCalled();
       expect(quote1.feeAmount).toBe(quote2.feeAmount);
       expect(quote1.deadline).toBe(quote2.deadline);
     });
@@ -263,12 +281,14 @@ describe('FeeService', () => {
 
       mockGasOracleService.estimateExecuteGas.mockClear();
       mockGasOracleService.getGasPrice.mockClear();
+      mockGasOracleService.getOmPriceUsd.mockClear();
 
       await service.getFeeQuote(differentRequest);
 
       // Should make new RPC calls for different parameters
       expect(mockGasOracleService.estimateExecuteGas).toHaveBeenCalled();
       expect(mockGasOracleService.getGasPrice).toHaveBeenCalled();
+      expect(mockGasOracleService.getOmPriceUsd).toHaveBeenCalled();
     });
   });
 

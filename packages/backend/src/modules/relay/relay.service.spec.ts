@@ -8,6 +8,7 @@ import { RelayService } from './relay.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { RelayerWalletService } from '../blockchain/relayer-wallet.service';
 import { GasOracleService } from '../blockchain/gas-oracle.service';
+import { FeeService } from '../fee/fee.service';
 import { RelayRequestDto } from './dto/relay-request.dto';
 
 // Mock viem functions
@@ -88,6 +89,11 @@ describe('RelayService', () => {
     isGasPriceAcceptable: jest.fn().mockResolvedValue(true),
   };
 
+  const mockFeeService = {
+    verifyFeeQuote: jest.fn().mockReturnValue(true),
+    getFeeQuote: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -101,6 +107,7 @@ describe('RelayService', () => {
         { provide: BlockchainService, useValue: mockBlockchainService },
         { provide: RelayerWalletService, useValue: mockRelayerWalletService },
         { provide: GasOracleService, useValue: mockGasOracleService },
+        { provide: FeeService, useValue: mockFeeService },
       ],
     }).compile();
 
@@ -419,6 +426,7 @@ describe('RelayService', () => {
           { provide: BlockchainService, useValue: mockBlockchainService },
           { provide: RelayerWalletService, useValue: mockRelayerWalletService },
           { provide: GasOracleService, useValue: mockGasOracleService },
+          { provide: FeeService, useValue: mockFeeService },
         ],
       }).compile();
 
