@@ -451,6 +451,257 @@ describe('RelayService', () => {
     });
   });
 
+  describe('relay with fee (relayWithFee path)', () => {
+    const mockFeeToken = '0x4B545d0758eda6601B051259bD977125fbdA7ba2';
+    const mockFeeAmount = '50000';
+    const mockFeeSignature = '0xdeadbeef';
+
+    const mockFeeRequest: RelayRequestDto = {
+      userAddress: mockUserAddress,
+      signature:
+        '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890',
+      chainId: mockChainId,
+      intent: {
+        destination: '0x9999999999999999999999999999999999999999',
+        value: '0',
+        data: '0x',
+        nonce: '0',
+        deadline: String(Math.floor(Date.now() / 1000) + 3600),
+      },
+      fee: {
+        feeToken: mockFeeToken,
+        feeAmount: mockFeeAmount,
+        feeSignature: mockFeeSignature,
+      },
+    };
+
+    describe('routing', () => {
+      it('should route to fee path when request.fee is present', async () => {
+        const result = await service.relay(mockFeeRequest);
+
+        expect(result).toEqual({
+          txHash: mockTxHash,
+          status: 'submitted',
+          message:
+            'Transaction with fee successfully submitted to the network',
+        });
+      });
+
+      it('should route to legacy path when request.fee is absent', async () => {
+        const result = await service.relay(mockRelayRequest);
+
+        expect(result).toEqual({
+          txHash: mockTxHash,
+          status: 'submitted',
+          message: 'Transaction successfully submitted to the network',
+        });
+      });
+
+      it('should still validate chain ID before routing to fee path', async () => {
+        const badChainRequest = { ...mockFeeRequest, chainId: 9999 };
+
+        await expect(service.relay(badChainRequest)).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(service.relay(badChainRequest)).rejects.toThrow(
+          /Chain ID mismatch/,
+        );
+      });
+
+      it('should still validate deadline before routing to fee path', async () => {
+        const expiredRequest = {
+          ...mockFeeRequest,
+          intent: {
+            ...mockFeeRequest.intent,
+            deadline: String(Math.floor(Date.now() / 1000) - 3600),
+          },
+        };
+
+        await expect(service.relay(expiredRequest)).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(service.relay(expiredRequest)).rejects.toThrow(
+          /deadline has expired/,
+        );
+      });
+
+      it('should still check gas price before routing to fee path', async () => {
+        mockGasOracleService.isGasPriceAcceptable
+          .mockResolvedValueOnce(false)
+          .mockResolvedValueOnce(false);
+
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          /Gas price too high/,
+        );
+      });
+    });
+
+    describe('fee quote verification', () => {
+      it('should verify fee quote with feeService', async () => {
+        await service.relay(mockFeeRequest);
+
+        const feeDeadline = parseInt(mockFeeRequest.intent.deadline, 10);
+        expect(mockFeeService.verifyFeeQuote).toHaveBeenCalledWith(
+          mockFeeAmount,
+          mockFeeToken,
+          feeDeadline,
+          mockFeeSignature,
+        );
+      });
+
+      it('should reject when fee quote is invalid', async () => {
+        mockFeeService.verifyFeeQuote
+          .mockReturnValueOnce(false)
+          .mockReturnValueOnce(false);
+
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          /Invalid or expired fee quote/,
+        );
+      });
+
+      it('should reject when fee quote has expired', async () => {
+        mockFeeService.verifyFeeQuote.mockReturnValueOnce(false);
+
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          BadRequestException,
+        );
+      });
+    });
+
+    describe('batch digest and signature verification', () => {
+      it('should compute a batch digest for signature verification', async () => {
+        await service.relay(mockFeeRequest);
+
+        expect(recoverAddress).toHaveBeenCalledWith({
+          hash: expect.stringMatching(/^0x[a-fA-F0-9]{64}$/),
+          signature: mockFeeRequest.signature,
+        });
+      });
+
+      it('should produce a different digest than legacy path', async () => {
+        // Relay with fee
+        await service.relay(mockFeeRequest);
+        const feeDigest = (recoverAddress as jest.Mock).mock.calls[0][0].hash;
+
+        jest.clearAllMocks();
+        (recoverAddress as jest.Mock).mockResolvedValue(mockUserAddress);
+        mockGasOracleService.isGasPriceAcceptable.mockResolvedValue(true);
+        mockWalletClient.sendTransaction.mockResolvedValue(mockTxHash);
+        mockPublicClient.estimateGas.mockResolvedValue(BigInt(150000));
+
+        // Relay without fee (same intent)
+        const legacyRequest = {
+          ...mockFeeRequest,
+          fee: undefined,
+        };
+        await service.relay(legacyRequest);
+        const legacyDigest = (recoverAddress as jest.Mock).mock.calls[0][0]
+          .hash;
+
+        expect(feeDigest).not.toBe(legacyDigest);
+      });
+
+      it('should reject batch signature mismatch', async () => {
+        (recoverAddress as jest.Mock)
+          .mockResolvedValueOnce('0x1111111111111111111111111111111111111111')
+          .mockResolvedValueOnce('0x1111111111111111111111111111111111111111');
+
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          /Batch signature verification failed/,
+        );
+      });
+
+      it('should handle case-insensitive address comparison for batch sig', async () => {
+        (recoverAddress as jest.Mock).mockResolvedValueOnce(
+          mockUserAddress.toUpperCase(),
+        );
+
+        const result = await service.relay(mockFeeRequest);
+        expect(result).toBeDefined();
+      });
+
+      it('should handle invalid batch signature format', async () => {
+        (recoverAddress as jest.Mock)
+          .mockRejectedValueOnce(new Error('Invalid signature format'))
+          .mockRejectedValueOnce(new Error('Invalid signature format'));
+
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          /Invalid signature format/,
+        );
+      });
+    });
+
+    describe('batch transaction broadcasting', () => {
+      it('should broadcast batch transaction via sendTransaction', async () => {
+        await service.relay(mockFeeRequest);
+
+        expect(mockWalletClient.sendTransaction).toHaveBeenCalledWith(
+          expect.objectContaining({
+            to: mockUserAddress,
+            account: mockRelayerAccount,
+            data: expect.stringMatching(/^0x/),
+            gas: expect.any(BigInt),
+          }),
+        );
+      });
+
+      it('should use relayer address for fee transfer call', async () => {
+        await service.relay(mockFeeRequest);
+
+        expect(mockRelayerWalletService.getAddress).toHaveBeenCalled();
+      });
+
+      it('should throw InternalServerErrorException on batch broadcast failure', async () => {
+        mockWalletClient.sendTransaction.mockRejectedValueOnce(
+          new Error('RPC error'),
+        );
+
+        await expect(service.relay(mockFeeRequest)).rejects.toThrow(
+          InternalServerErrorException,
+        );
+      });
+
+      it('should estimate gas for batch transaction', async () => {
+        await service.relay(mockFeeRequest);
+
+        expect(mockPublicClient.estimateGas).toHaveBeenCalled();
+      });
+
+      it('should use fallback gas with 150% buffer when batch estimation fails', async () => {
+        mockConfigService.get.mockImplementation((key: string) => {
+          const config: Record<string, any> = {
+            'contracts.delegatedAccount': mockDelegatedAccount,
+            maxGasPriceGwei: 100,
+            'fee.estimatedGas': 300000,
+          };
+          return config[key];
+        });
+        mockPublicClient.estimateGas.mockRejectedValueOnce(
+          new Error('Gas estimation failed'),
+        );
+
+        const result = await service.relay(mockFeeRequest);
+        expect(result.txHash).toBe(mockTxHash);
+
+        // Fallback = 300000 * 150% = 450000
+        const call = mockWalletClient.sendTransaction.mock.calls[0][0];
+        expect(call.gas).toBe(BigInt(450000));
+      });
+    });
+  });
+
   describe('EIP-712 digest computation', () => {
     it('should compute digest for signature verification', async () => {
       await service.relay(mockRelayRequest);
