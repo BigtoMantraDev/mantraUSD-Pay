@@ -38,9 +38,7 @@ describe('FeeService', () => {
     getOmPriceUsd: jest.fn().mockResolvedValue(mockOmPriceUsd),
   };
 
-  const mockSignTypedData = jest
-    .fn()
-    .mockResolvedValue('0x' + 'ab'.repeat(65));
+  const mockSignTypedData = jest.fn().mockResolvedValue('0x' + 'ab'.repeat(65));
 
   const mockRelayerWalletService = {
     getAddress: jest.fn().mockReturnValue(mockRelayerAddress),

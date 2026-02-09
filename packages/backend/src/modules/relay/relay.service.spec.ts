@@ -482,8 +482,7 @@ describe('RelayService', () => {
         expect(result).toEqual({
           txHash: mockTxHash,
           status: 'submitted',
-          message:
-            'Transaction with fee successfully submitted to the network',
+          message: 'Transaction with fee successfully submitted to the network',
         });
       });
 
