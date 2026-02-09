@@ -272,6 +272,18 @@ export function TransferForm({
             </Card>
           )}
 
+          {/* EIP-7702 Delegation Notice */}
+          {userAddress && (
+            <Alert>
+              <AlertDescription className="text-sm">
+                <strong>Note:</strong> This app uses EIP-7702 delegation.
+                Your wallet may not support signing the authorization prompt.
+                If so, you must delegate your account separately using a script
+                or direct chain interaction before using this app.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Error Display */}
           {status === 'error' && errorMessage && (
             <Alert variant="destructive">
