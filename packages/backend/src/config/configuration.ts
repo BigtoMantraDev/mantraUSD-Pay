@@ -22,10 +22,20 @@ export default () => ({
   fee: {
     enabled: process.env.FEE_ENABLED !== 'false',
     estimatedGas: parseInt(process.env.FEE_ESTIMATED_GAS || '150000', 10),
+    delegatedAccountOverhead: parseInt(
+      process.env.FEE_DELEGATED_ACCOUNT_OVERHEAD || '85000',
+      10,
+    ),
     bufferPercent: parseInt(process.env.FEE_BUFFER_PERCENT || '20', 10),
-    min: parseFloat(process.env.FEE_MIN || '0.01'),
+    min: parseFloat(process.env.FEE_MIN || '0'),
     max: parseFloat(process.env.FEE_MAX || '1.00'),
     quoteTtlSeconds: parseInt(process.env.FEE_QUOTE_TTL_SECONDS || '60', 10),
+  },
+
+  price: {
+    coingeckoId: process.env.COINGECKO_TOKEN_ID || 'mantra-dao',
+    cacheTtlSeconds: parseInt(process.env.PRICE_CACHE_TTL_SECONDS || '60', 10),
+    fallbackOmUsd: parseFloat(process.env.OM_PRICE_USD_FALLBACK || '0.50'),
   },
 
   rateLimit: {

@@ -10,6 +10,17 @@ pragma solidity ^0.8.20;
  *      while the user's EOA executes the action.
  */
 interface IDelegatedAccount {
+    // ============ Structs ============
+
+    /// @notice Call data for batch execution
+    struct Call {
+        address destination;
+        uint256 value;
+        bytes data;
+    }
+
+    // ============ Events ============
+
     /**
      * @notice Emitted when a call is successfully executed
      * @param account The account that authorized the execution (address(this) with EIP-7702)
@@ -19,6 +30,15 @@ interface IDelegatedAccount {
      * @param success Whether the call succeeded
      */
     event Executed(address indexed account, address indexed destination, uint256 value, uint256 nonce, bool success);
+
+    /**
+     * @notice Emitted when a batch of calls is executed
+     * @param account The account that authorized the execution
+     * @param callCount The number of calls executed
+     * @param nonce The nonce used for this batch
+     * @param success Whether all calls succeeded
+     */
+    event BatchExecuted(address indexed account, uint256 callCount, uint256 nonce, bool success);
 
     /**
      * @notice Emitted when tokens are transferred via the helper function
@@ -51,6 +71,24 @@ interface IDelegatedAccount {
     )
         external
         returns (bytes memory);
+
+    /**
+     * @notice Execute multiple calls atomically using EIP-7702 delegation
+     * @dev All calls must succeed or the entire batch reverts. Used for transfers with fees.
+     * @param calls The array of calls to execute
+     * @param nonce The nonce for replay protection
+     * @param deadline The timestamp after which the signature expires
+     * @param signature The EIP-712 signature authorizing the batch execution
+     * @return results The return data from each executed call
+     */
+    function executeBatch(
+        Call[] calldata calls,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    )
+        external
+        returns (bytes[] memory results);
 
     /**
      * @notice Transfer ERC-20 tokens on behalf of the delegating account

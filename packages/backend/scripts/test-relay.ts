@@ -19,20 +19,20 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import {
+  type Address,
+  concat,
   createPublicClient,
   createWalletClient,
-  http,
   defineChain,
-  encodeFunctionData,
-  keccak256,
   encodeAbiParameters,
-  parseAbiParameters,
+  encodeFunctionData,
   formatEther,
+  type Hex,
+  http,
+  keccak256,
+  parseAbiParameters,
   parseUnits,
   toBytes,
-  concat,
-  type Hex,
-  type Address,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
@@ -118,6 +118,16 @@ const INTENT_TYPEHASH = keccak256(
   ),
 );
 
+const BATCHED_INTENT_TYPEHASH = keccak256(
+  toBytes(
+    'BatchedIntent(Call[] calls,uint256 nonce,uint256 deadline)Call(address destination,uint256 value,bytes data)',
+  ),
+);
+
+const CALL_TYPEHASH = keccak256(
+  toBytes('Call(address destination,uint256 value,bytes data)'),
+);
+
 // Pre-computed constants from the contract for verification
 const CONTRACT_DOMAIN_TYPEHASH =
   '0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f';
@@ -149,7 +159,10 @@ function computeDigest(
     console.log('Domain TypeHash:');
     console.log('  Computed:', EIP712_DOMAIN_TYPEHASH);
     console.log('  Contract:', CONTRACT_DOMAIN_TYPEHASH);
-    console.log('  Match:', EIP712_DOMAIN_TYPEHASH === CONTRACT_DOMAIN_TYPEHASH);
+    console.log(
+      '  Match:',
+      EIP712_DOMAIN_TYPEHASH === CONTRACT_DOMAIN_TYPEHASH,
+    );
     console.log('Name Hash:');
     console.log('  Computed:', nameHash);
     console.log('  Contract:', CONTRACT_NAME_HASH);
@@ -199,11 +212,62 @@ function computeDigest(
 
   // Compute final EIP-712 digest using raw concatenation (NOT ABI encoding!)
   // The format is: keccak256("\x19\x01" || domainSeparator || structHash)
-  const digest = keccak256(
-    concat(['0x1901', domainSeparator, intentHash]),
+  return keccak256(concat(['0x1901', domainSeparator, intentHash]));
+}
+
+function computeBatchDigest(
+  calls: Array<{
+    destination: Address;
+    value: bigint;
+    data: Hex;
+  }>,
+  nonce: bigint,
+  deadline: bigint,
+  chainId: number,
+  verifyingContract: Address,
+): Hex {
+  const nameHash = keccak256(toBytes('DelegatedAccount'));
+  const versionHash = keccak256(toBytes('1'));
+
+  // Compute domain separator
+  const domainSeparator = keccak256(
+    encodeAbiParameters(
+      parseAbiParameters('bytes32, bytes32, bytes32, uint256, address'),
+      [
+        EIP712_DOMAIN_TYPEHASH,
+        nameHash,
+        versionHash,
+        BigInt(chainId),
+        verifyingContract,
+      ],
+    ),
   );
 
-  return digest;
+  // Compute hash for each call
+  const callHashes: Hex[] = [];
+  for (const call of calls) {
+    const callHash = keccak256(
+      encodeAbiParameters(
+        parseAbiParameters('bytes32, address, uint256, bytes32'),
+        [CALL_TYPEHASH, call.destination, call.value, keccak256(call.data)],
+      ),
+    );
+    callHashes.push(callHash);
+  }
+
+  // Compute array hash (keccak256 of concatenated call hashes)
+  const callsArrayHash = keccak256(concat(callHashes) as Hex);
+
+  // Compute BatchedIntent struct hash
+  const structHash = keccak256(
+    encodeAbiParameters(
+      parseAbiParameters('bytes32, bytes32, uint256, uint256'),
+      [BATCHED_INTENT_TYPEHASH, callsArrayHash, nonce, deadline],
+    ),
+  );
+
+  // Compute final EIP-712 digest
+  return keccak256(concat(['0x1901', domainSeparator, structHash]));
 }
 
 // ============ Main ============
@@ -314,8 +378,8 @@ async function main() {
   }
 
   // Prepare transfer
-  const TRANSFER_AMOUNT = parseUnits('0.01', TOKEN_DECIMALS); // 0.01 mantraUSD
-  const RECIPIENT = account.address; // Self-transfer for testing
+  const TRANSFER_AMOUNT = parseUnits('1', TOKEN_DECIMALS); // 1 mantraUSD
+  const RECIPIENT = '0x2Ce47Bf579A914e7b3Ba29F84425529549a302Aa' as Address;
 
   console.log('\n--- Preparing Transfer ---');
   console.log(
@@ -330,26 +394,68 @@ async function main() {
   });
   console.log(`Encoded transfer data: ${transferData.slice(0, 20)}...`);
 
-  // Create intent
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300); // 5 minutes from now
-  const intent = {
-    destination: TOKEN_ADDRESS,
-    value: 0n,
-    data: transferData,
+  // Fetch fee quote from backend
+  console.log('\n--- Fetching Fee Quote ---');
+  let feeQuote: {
+    feeAmount: string;
+    feeToken: string;
+    deadline: number;
+    signature: string;
+    relayerAddress: string;
+  };
+  try {
+    const feeRes = await fetch(
+      `${API_BASE}/fees/quote?token=${TOKEN_ADDRESS}&amount=${TRANSFER_AMOUNT.toString()}&recipient=${RECIPIENT}&sender=${account.address}`,
+    );
+    if (!feeRes.ok) {
+      throw new Error(`HTTP ${feeRes.status}: ${await feeRes.text()}`);
+    }
+    feeQuote = await feeRes.json();
+    const feeFormatted =
+      Number(feeQuote.feeAmount) / Math.pow(10, TOKEN_DECIMALS);
+    console.log(`Fee: ${feeFormatted} ${TOKEN_SYMBOL}`);
+    console.log(`Fee token: ${feeQuote.feeToken}`);
+    console.log(`Fee relayer: ${feeQuote.relayerAddress}`);
+    console.log(`Fee deadline: ${feeQuote.deadline}`);
+  } catch (error) {
+    console.error('ERROR: Could not fetch fee quote:', error);
+    process.exit(1);
+  }
+
+  // Build batch calls: user transfer + fee transfer
+  const feeTransferData = encodeFunctionData({
+    abi: erc20Abi,
+    functionName: 'transfer',
+    args: [feeQuote.relayerAddress as Address, BigInt(feeQuote.feeAmount)],
+  });
+
+  const calls = [
+    {
+      destination: TOKEN_ADDRESS,
+      value: 0n,
+      data: transferData,
+    },
+    {
+      destination: feeQuote.feeToken as Address,
+      value: 0n,
+      data: feeTransferData,
+    },
+  ];
+
+  // Use the fee quote's deadline so the backend can verify the fee signature
+  const deadline = BigInt(feeQuote.deadline);
+
+  console.log('\n--- Signing EIP-712 BatchedIntent ---');
+
+  // Compute batch digest and sign
+  const digest = computeBatchDigest(
+    calls,
     nonce,
     deadline,
-  };
-
-  console.log('\n--- Signing EIP-712 Intent ---');
-
-  // Compute digest and sign (with debug=true to verify hash computation)
-  const digest = computeDigest(
-    intent,
     CHAIN_ID,
     DELEGATED_ACCOUNT_ADDRESS,
-    true,
   );
-  console.log(`Digest: ${digest.slice(0, 20)}...`);
+  console.log(`Batch digest: ${digest.slice(0, 20)}...`);
 
   // Use raw ECDSA signature (no Ethereum message prefix) for EIP-712
   const signature = await account.sign({
@@ -394,11 +500,16 @@ async function main() {
       yParity: authorization.yParity,
     },
     intent: {
-      destination: intent.destination,
-      value: `0x${intent.value.toString(16)}`,
-      data: intent.data,
-      nonce: intent.nonce.toString(),
-      deadline: intent.deadline.toString(),
+      destination: TOKEN_ADDRESS,
+      value: '0x0',
+      data: transferData,
+      nonce: nonce.toString(),
+      deadline: deadline.toString(),
+    },
+    fee: {
+      feeToken: feeQuote.feeToken,
+      feeAmount: feeQuote.feeAmount,
+      feeSignature: feeQuote.signature,
     },
     chainId: CHAIN_ID,
   };
@@ -449,7 +560,7 @@ async function main() {
 
     if (responseData.txHash) {
       console.log(
-        `\nExplorer: https://explorer.dukong.mantrachain.io/tx/${responseData.txHash}`,
+        `\nExplorer: https://explorer.dukong.io/tx/${responseData.txHash}`,
       );
     }
   } catch (error) {
