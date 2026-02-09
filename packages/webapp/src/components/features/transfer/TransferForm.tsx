@@ -64,12 +64,11 @@ export function TransferForm({
     isLoading: nonceLoading,
     error: nonceError,
   } = useNonce(userAddress);
-  const { signExecuteData } = useEIP712Sign();
+  const { signBatchedIntent } = useEIP712Sign();
   const relayMutation = useRelayTransaction();
   const {
     getOrSignAuthorization,
     getCachedAuthorization,
-    isSupported: authSupported,
   } = useSignAuthorization();
 
   // Validation
@@ -113,21 +112,24 @@ export function TransferForm({
       }
 
       try {
-        // Step 1: Get or sign EIP-7702 authorization (per-session)
-        // If wallet doesn't support EIP-7702, we proceed without authorization
+        // Step 1: Try to get EIP-7702 authorization for Type 4 tx
+        // MetaMask doesn't support signAuthorization from webapps, so we
+        // proceed without it — the backend will still send the tx and it
+        // works if the EOA was previously delegated on-chain.
         let authorization = getCachedAuthorization();
-        if (!authorization && authSupported !== false) {
+        if (!authorization) {
           setStatus('authorizing');
           const authResult = await getOrSignAuthorization();
           authorization = authResult.authorization;
 
-          // If signing failed with an error (not just unsupported), show it
-          if (authResult.error && authResult.supported) {
+          // Only throw if the wallet *does* support it but returned an error
+          // (e.g. user rejected the prompt). Unsupported wallets silently skip.
+          if (!authorization && authResult.error && authResult.supported) {
             throw new Error(authResult.error);
           }
         }
 
-        // Step 2: Sign EIP-712 intent
+        // Step 2: Sign EIP-712 BatchedIntent (user transfer + fee transfer)
         setStatus('signing');
         const executeData: ExecuteData = {
           owner: userAddress,
@@ -140,7 +142,11 @@ export function TransferForm({
           nonce: nonce,
         };
 
-        const ownerSignature = await signExecuteData(executeData);
+        const ownerSignature = await signBatchedIntent(executeData, {
+          feeAmount: feeQuote.feeAmount,
+          feeToken: feeQuote.feeToken,
+          relayerAddress: feeQuote.relayerAddress,
+        });
 
         // Step 3: Relay with EIP-7702 authorization (if available)
         setStatus('relaying');
@@ -170,9 +176,8 @@ export function TransferForm({
       amountWei,
       recipient,
       getCachedAuthorization,
-      authSupported,
       getOrSignAuthorization,
-      signExecuteData,
+      signBatchedIntent,
       relayMutation,
       onSuccess,
     ],
@@ -265,6 +270,18 @@ export function TransferForm({
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* EIP-7702 Delegation Notice */}
+          {userAddress && (
+            <Alert>
+              <AlertDescription className="text-sm">
+                <strong>Note:</strong> This app uses EIP-7702 delegation.
+                Your wallet may not support signing the authorization prompt.
+                If so, you must delegate your account separately using a script
+                or direct chain interaction before using this app.
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Error Display */}
