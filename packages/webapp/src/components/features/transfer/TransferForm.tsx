@@ -64,7 +64,7 @@ export function TransferForm({
     isLoading: nonceLoading,
     error: nonceError,
   } = useNonce(userAddress);
-  const { signExecuteData, signBatchedIntent } = useEIP712Sign();
+  const { signExecuteData } = useEIP712Sign();
   const relayMutation = useRelayTransaction();
   const {
     getOrSignAuthorization,
@@ -116,27 +116,15 @@ export function TransferForm({
         // Step 1: Get or sign EIP-7702 authorization (per-session)
         // If wallet doesn't support EIP-7702, we proceed without authorization
         let authorization = getCachedAuthorization();
-        console.log('[Transfer] Cached authorization:', authorization);
-        console.log('[Transfer] authSupported:', authSupported);
-
         if (!authorization && authSupported !== false) {
           setStatus('authorizing');
-          console.log('[Transfer] Requesting new authorization...');
           const authResult = await getOrSignAuthorization();
           authorization = authResult.authorization;
-          console.log('[Transfer] Authorization result:', authResult);
 
           // If signing failed with an error (not just unsupported), show it
           if (authResult.error && authResult.supported) {
             throw new Error(authResult.error);
           }
-        }
-
-        if (!authorization) {
-          console.warn(
-            '[Transfer] No authorization available - transaction will fail! ' +
-              'Wallet may not support EIP-7702.',
-          );
         }
 
         // Step 2: Sign EIP-712 intent
@@ -152,9 +140,7 @@ export function TransferForm({
           nonce: nonce,
         };
 
-        // Use batch signing for fee-enabled transactions
-        // This signs both the user transfer and fee transfer atomically
-        const ownerSignature = await signBatchedIntent(executeData, feeQuote);
+        const ownerSignature = await signExecuteData(executeData);
 
         // Step 3: Relay with EIP-7702 authorization (if available)
         setStatus('relaying');
@@ -186,7 +172,7 @@ export function TransferForm({
       getCachedAuthorization,
       authSupported,
       getOrSignAuthorization,
-      signBatchedIntent,
+      signExecuteData,
       relayMutation,
       onSuccess,
     ],

@@ -95,15 +95,6 @@ export function useRelayTransaction() {
         chainId: config.chainId,
       };
 
-      // Include fee information if feeAmount is provided (for batch execution)
-      if (request.executeData.feeAmount > 0n && request.feeSignature) {
-        payload.fee = {
-          feeToken: request.executeData.feeToken,
-          feeAmount: request.executeData.feeAmount.toString(),
-          feeSignature: request.feeSignature,
-        };
-      }
-
       // Include EIP-7702 authorization if provided
       if (request.authorization) {
         payload.authorization = {

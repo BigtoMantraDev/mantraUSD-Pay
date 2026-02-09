@@ -1,9 +1,8 @@
-import { type Address, type TypedDataDomain, encodeFunctionData } from 'viem';
+import { type TypedDataDomain, encodeFunctionData } from 'viem';
 import { useSignTypedData } from 'wagmi';
 
 import { useAppConfig } from './useAppConfig';
 import { type ExecuteData } from './useRelayTransaction';
-import { type FeeQuote } from './useFeeQuote';
 
 /**
  * EIP-712 typed data structure for Intent
@@ -18,32 +17,6 @@ const INTENT_TYPES = {
     { name: 'deadline', type: 'uint256' },
   ],
 } as const;
-
-/**
- * EIP-712 typed data structure for BatchedIntent
- * This matches the contract's BATCHED_INTENT_TYPEHASH
- */
-const BATCHED_INTENT_TYPES = {
-  BatchedIntent: [
-    { name: 'calls', type: 'Call[]' },
-    { name: 'nonce', type: 'uint256' },
-    { name: 'deadline', type: 'uint256' },
-  ],
-  Call: [
-    { name: 'destination', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'data', type: 'bytes' },
-  ],
-} as const;
-
-/**
- * Call structure for batch execution
- */
-interface Call {
-  destination: Address;
-  value: bigint;
-  data: `0x${string}`;
-}
 
 /**
  * Hook to sign ExecuteData using EIP-712 for EIP-7702 delegation
@@ -119,91 +92,12 @@ export function useEIP712Sign() {
     });
   };
 
-  /**
-   * Sign batched intent with EIP-712 for transfers with fees
-   * Creates batch with user transfer + fee transfer to relayer
-   * @param executeData - Execute data containing transfer details
-   * @param feeQuote - Fee quote from backend containing fee amount and relayer address
-   * @returns Promise<`0x${string}`> - Signature in hex format
-   */
-  const signBatchedIntent = async (
-    executeData: ExecuteData,
-    feeQuote: FeeQuote,
-  ): Promise<`0x${string}`> => {
-    // Encode user's ERC20 transfer call
-    const userTransferData = encodeFunctionData({
-      abi: [
-        {
-          name: 'transfer',
-          type: 'function',
-          stateMutability: 'nonpayable',
-          inputs: [
-            { name: 'to', type: 'address' },
-            { name: 'amount', type: 'uint256' },
-          ],
-          outputs: [{ name: '', type: 'bool' }],
-        },
-      ],
-      functionName: 'transfer',
-      args: [executeData.to, executeData.amount],
-    });
-
-    // Encode fee transfer call to relayer
-    const feeTransferData = encodeFunctionData({
-      abi: [
-        {
-          name: 'transfer',
-          type: 'function',
-          stateMutability: 'nonpayable',
-          inputs: [
-            { name: 'to', type: 'address' },
-            { name: 'amount', type: 'uint256' },
-          ],
-          outputs: [{ name: '', type: 'bool' }],
-        },
-      ],
-      functionName: 'transfer',
-      args: [feeQuote.relayerAddress, BigInt(feeQuote.feeAmount)],
-    });
-
-    // Build calls array: user transfer first, then fee transfer
-    const calls: Call[] = [
-      {
-        destination: executeData.token,
-        value: 0n,
-        data: userTransferData,
-      },
-      {
-        destination: feeQuote.feeToken,
-        value: 0n,
-        data: feeTransferData,
-      },
-    ];
-
-    // Create BatchedIntent message
-    const batchedIntent = {
-      calls,
-      nonce: executeData.nonce,
-      deadline: executeData.deadline,
-    };
-
-    const domain = getDomain();
-
-    return signTypedData.signTypedDataAsync({
-      domain,
-      types: BATCHED_INTENT_TYPES,
-      primaryType: 'BatchedIntent',
-      message: batchedIntent,
-    });
-  };
-
   // Default domain for reference
   const domain = getDomain();
 
   return {
     ...signTypedData,
     signExecuteData,
-    signBatchedIntent,
     getDomain,
     domain,
   };
