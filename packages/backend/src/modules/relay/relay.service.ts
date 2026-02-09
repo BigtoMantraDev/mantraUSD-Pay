@@ -63,7 +63,9 @@ export class RelayService {
 
   async relay(request: RelayRequestDto): Promise<RelayResponseDto> {
     // Log incoming request for debugging
-    this.logger.debug(`Relay request received for user: ${request.userAddress}`);
+    this.logger.debug(
+      `Relay request received for user: ${request.userAddress}`,
+    );
     this.logger.debug(`Authorization present: ${!!request.authorization}`);
     if (request.authorization) {
       this.logger.debug(
@@ -428,7 +430,7 @@ export class RelayService {
 
     // Send EIP-7702 Type 4 transaction
     // The authorization list temporarily designates the DelegatedAccount contract onto the user's EOA
-    const hash = await walletClient.sendTransaction({
+    return await walletClient.sendTransaction({
       account: relayerAccount,
       to: targetAddress,
       data: functionData,
@@ -437,8 +439,6 @@ export class RelayService {
       authorizationList:
         authorizationList.length > 0 ? authorizationList : undefined,
     });
-
-    return hash;
   }
 
   /**
@@ -490,9 +490,7 @@ export class RelayService {
     }
 
     // Compute array hash (keccak256 of concatenated call hashes)
-    const callsArrayHash = keccak256(
-      concat(callHashes) as `0x${string}`,
-    );
+    const callsArrayHash = keccak256(concat(callHashes) as `0x${string}`);
 
     // Compute BatchedIntent struct hash
     const structHash = keccak256(
@@ -610,7 +608,7 @@ export class RelayService {
     }
 
     // Send EIP-7702 Type 4 transaction
-    const hash = await walletClient.sendTransaction({
+    return await walletClient.sendTransaction({
       account: relayerAccount,
       to: targetAddress,
       data: functionData,
@@ -619,7 +617,5 @@ export class RelayService {
       authorizationList:
         authorizationList.length > 0 ? authorizationList : undefined,
     });
-
-    return hash;
   }
 }

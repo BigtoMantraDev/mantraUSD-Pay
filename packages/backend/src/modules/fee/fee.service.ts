@@ -57,13 +57,24 @@ export class FeeService {
     // Get current gas price
     const gasPrice = await this.gasOracleService.getGasPrice();
 
-    // Calculate gas cost in wei
+    // Calculate gas cost in native wei (18 decimals)
     const gasCost = gasPrice * estimatedGas;
 
-    // Apply buffer
-    // Convert to token wei (assuming 1:1 price parity)
-    // In production, you'd use a price oracle to convert native token cost to fee token
-    let feeWei = (gasCost * BigInt(100 + bufferPercent)) / BigInt(100);
+    // Fetch OM/USD price to convert gas cost to mantraUSD
+    const omPriceUsd = await this.gasOracleService.getOmPriceUsd();
+
+    // Convert: gasCost (wei) * omPrice (USD/OM) / 10^18 (wei→OM) * 10^tokenDecimals (→token wei)
+    // Use integer math with precision multiplier to avoid floating point
+    const pricePrecision = 1_000_000n; // 6 decimal places for price
+    const omPriceBigInt = BigInt(
+      Math.round(omPriceUsd * Number(pricePrecision)),
+    );
+    const tokenScale = BigInt(10) ** BigInt(tokenDecimals);
+    const nativeScale = BigInt(10) ** 18n;
+
+    let feeWei =
+      (gasCost * omPriceBigInt * tokenScale * BigInt(100 + bufferPercent)) /
+      (nativeScale * pricePrecision * 100n);
 
     // Apply min/max caps (convert to wei first)
     const minFeeWei = parseUnits(minFee.toString(), tokenDecimals);
@@ -84,7 +95,7 @@ export class FeeService {
     const signature = `0x${messageHash.slice(2)}${'00'.repeat(32)}`;
 
     this.logger.debug(
-      `Fee quote: ${feeWei.toString()} wei (gas: ${estimatedGas}, price: ${gasPrice})`,
+      `Fee quote: ${feeWei.toString()} token wei (gas: ${estimatedGas}, gasPrice: ${gasPrice}, OM/USD: $${omPriceUsd})`,
     );
 
     // Get relayer address for fee collection

@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BlockchainService } from './blockchain.service';
-import { formatGwei, parseGwei } from 'viem';
+import { encodeFunctionData, formatGwei, parseGwei, type Address } from 'viem';
 
 @Injectable()
 export class GasOracleService {
   private readonly logger = new Logger(GasOracleService.name);
+
+  private priceCache: { price: number; expiresAt: number } | null = null;
 
   constructor(
     private blockchainService: BlockchainService,
@@ -43,16 +45,11 @@ export class GasOracleService {
   /**
    * Estimate gas for DelegatedAccount.execute() transaction
    *
-   * Uses a static gas estimate because:
-   * 1. Cannot simulate execute() with dummy signature (ECDSA recovery fails)
-   * 2. ERC20 transfers via DelegatedAccount have predictable gas costs
-   * 3. Live gas price (fetched separately) is the real variable component
+   * Attempts real on-chain estimation for the ERC20 transfer, then adds
+   * a configurable overhead for DelegatedAccount execution (signature
+   * verification, nonce management, event emission).
    *
-   * Gas breakdown:
-   * - Standard ERC20.transfer(): ~65k gas
-   * - DelegatedAccount overhead (signature verification, nonce, event): ~55k gas
-   * - Safety buffer: ~30k gas
-   * - Total: ~150k gas (configurable via FEE_ESTIMATED_GAS)
+   * Falls back to static config value if estimation fails.
    */
   async estimateExecuteGas(params: {
     tokenAddress: string;
@@ -60,13 +57,103 @@ export class GasOracleService {
     recipient: string;
     sender?: string;
   }): Promise<bigint> {
-    const staticGas = this.configService.get<number>('fee.estimatedGas')!;
-
-    this.logger.debug(
-      `Using static gas estimate: ${staticGas} units ` +
-        `(token: ${params.tokenAddress}, amount: ${params.amount})`,
+    const staticGas = BigInt(
+      this.configService.get<number>('fee.estimatedGas')!,
+    );
+    const overhead = BigInt(
+      this.configService.get<number>('fee.delegatedAccountOverhead')!,
     );
 
-    return BigInt(staticGas);
+    if (!params.sender) {
+      this.logger.debug(
+        `No sender provided, using static gas estimate: ${staticGas}`,
+      );
+      return staticGas;
+    }
+
+    try {
+      const publicClient = this.blockchainService.getPublicClient();
+
+      const transferData = encodeFunctionData({
+        abi: [
+          {
+            name: 'transfer',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [
+              { name: 'to', type: 'address' },
+              { name: 'amount', type: 'uint256' },
+            ],
+            outputs: [{ name: '', type: 'bool' }],
+          },
+        ],
+        functionName: 'transfer',
+        args: [params.recipient as Address, BigInt(params.amount)],
+      });
+
+      const erc20Gas = await publicClient.estimateGas({
+        account: params.sender as Address,
+        to: params.tokenAddress as Address,
+        data: transferData,
+      });
+
+      const totalGas = erc20Gas + overhead;
+
+      this.logger.debug(
+        `Real gas estimate: ${erc20Gas} (ERC20) + ${overhead} (overhead) = ${totalGas}`,
+      );
+
+      return totalGas;
+    } catch (error) {
+      this.logger.warn(
+        `Gas estimation failed, using static fallback: ${staticGas} — ${error instanceof Error ? error.message : error}`,
+      );
+      return staticGas;
+    }
+  }
+
+  /**
+   * Fetch OM/USD price from CoinGecko with caching
+   */
+  async getOmPriceUsd(): Promise<number> {
+    const now = Date.now();
+    if (this.priceCache && this.priceCache.expiresAt > now) {
+      return this.priceCache.price;
+    }
+
+    const coingeckoId = this.configService.get<string>('price.coingeckoId')!;
+    const cacheTtl =
+      this.configService.get<number>('price.cacheTtlSeconds')! * 1000;
+    const fallbackPrice = this.configService.get<number>(
+      'price.fallbackOmUsd',
+    )!;
+
+    try {
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`;
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new Error(`CoinGecko HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const price = data[coingeckoId]?.usd;
+
+      if (typeof price !== 'number' || price <= 0) {
+        throw new Error(`Invalid price data: ${JSON.stringify(data)}`);
+      }
+
+      this.priceCache = { price, expiresAt: now + cacheTtl };
+      this.logger.debug(`OM price from CoinGecko: $${price}`);
+      return price;
+    } catch (error) {
+      this.logger.warn(
+        `CoinGecko price fetch failed, using fallback $${fallbackPrice} — ${error instanceof Error ? error.message : error}`,
+      );
+
+      // Cache the fallback for a shorter period (10s) to retry sooner
+      this.priceCache = { price: fallbackPrice, expiresAt: now + 10_000 };
+      return fallbackPrice;
+    }
   }
 }
