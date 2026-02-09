@@ -1,4 +1,4 @@
-import { type TypedDataDomain, encodeFunctionData } from 'viem';
+import { type Address, type TypedDataDomain, encodeFunctionData } from 'viem';
 import { useSignTypedData } from 'wagmi';
 
 import { useAppConfig } from './useAppConfig';
@@ -17,6 +17,36 @@ const INTENT_TYPES = {
     { name: 'deadline', type: 'uint256' },
   ],
 } as const;
+
+/**
+ * EIP-712 typed data structure for BatchedIntent
+ * This matches the contract's BATCHED_INTENT_TYPEHASH for executeBatch with fees
+ */
+const BATCHED_INTENT_TYPES = {
+  BatchedIntent: [
+    { name: 'calls', type: 'Call[]' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
+  ],
+  Call: [
+    { name: 'destination', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'data', type: 'bytes' },
+  ],
+} as const;
+
+const ERC20_TRANSFER_ABI = [
+  {
+    name: 'transfer',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const;
 
 /**
  * Hook to sign ExecuteData using EIP-712 for EIP-7702 delegation
@@ -46,7 +76,7 @@ export function useEIP712Sign() {
   });
 
   /**
-   * Sign execute data with EIP-712
+   * Sign execute data with EIP-712 (single Intent)
    * Converts ExecuteData to Intent format expected by contract
    * @param executeData - Data to sign
    * @returns Promise<`0x${string}`> - Signature in hex format
@@ -56,18 +86,7 @@ export function useEIP712Sign() {
   ): Promise<`0x${string}`> => {
     // Encode ERC20 transfer call
     const transferData = encodeFunctionData({
-      abi: [
-        {
-          name: 'transfer',
-          type: 'function',
-          stateMutability: 'nonpayable',
-          inputs: [
-            { name: 'to', type: 'address' },
-            { name: 'amount', type: 'uint256' },
-          ],
-          outputs: [{ name: '', type: 'bool' }],
-        },
-      ],
+      abi: ERC20_TRANSFER_ABI,
       functionName: 'transfer',
       args: [executeData.to, executeData.amount],
     });
@@ -92,12 +111,57 @@ export function useEIP712Sign() {
     });
   };
 
+  /**
+   * Sign batched intent with EIP-712 (BatchedIntent with fee)
+   * Signs both the user transfer and fee transfer calls atomically
+   * @param executeData - Transfer data (amount, recipient, token, nonce, deadline)
+   * @param feeQuote - Fee quote from backend (feeAmount, feeToken, relayerAddress)
+   * @returns Promise<`0x${string}`> - Signature in hex format
+   */
+  const signBatchedIntent = async (
+    executeData: ExecuteData,
+    feeQuote: { feeAmount: string; feeToken: Address; relayerAddress: Address },
+  ): Promise<`0x${string}`> => {
+    // Build call 1: user's ERC20 transfer
+    const transferData = encodeFunctionData({
+      abi: ERC20_TRANSFER_ABI,
+      functionName: 'transfer',
+      args: [executeData.to, executeData.amount],
+    });
+
+    // Build call 2: fee ERC20 transfer to relayer
+    const feeTransferData = encodeFunctionData({
+      abi: ERC20_TRANSFER_ABI,
+      functionName: 'transfer',
+      args: [feeQuote.relayerAddress, BigInt(feeQuote.feeAmount)],
+    });
+
+    const calls = [
+      { destination: executeData.token, value: 0n, data: transferData },
+      { destination: feeQuote.feeToken, value: 0n, data: feeTransferData },
+    ];
+
+    const domain = getDomain();
+
+    return signTypedData.signTypedDataAsync({
+      domain,
+      types: BATCHED_INTENT_TYPES,
+      primaryType: 'BatchedIntent',
+      message: {
+        calls,
+        nonce: executeData.nonce,
+        deadline: executeData.deadline,
+      },
+    });
+  };
+
   // Default domain for reference
   const domain = getDomain();
 
   return {
     ...signTypedData,
     signExecuteData,
+    signBatchedIntent,
     getDomain,
     domain,
   };

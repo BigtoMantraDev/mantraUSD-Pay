@@ -92,6 +92,11 @@ export function useRelayTransaction() {
           nonce: request.executeData.nonce.toString(),
           deadline: request.executeData.deadline.toString(),
         },
+        fee: {
+          feeToken: request.executeData.feeToken,
+          feeAmount: request.executeData.feeAmount.toString(),
+          feeSignature: request.feeSignature,
+        },
         chainId: config.chainId,
       };
 
